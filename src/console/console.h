@@ -2,6 +2,7 @@
 #define _CONSOLE_H
 
 void ConsoleInit(void);
-void UsartDebugSendString(const uint8_t *pucBuffer);
+void ConsoleCliStart(void);
+void UsartDebugSendString(const char *pucBuffer);
 
 #endif /* _CONSOLE_H */

@@ -14,7 +14,7 @@ CFLAGS= -c -fno-common \
 	-fdata-sections \
 	-O0 \
 	-ggdb3 \
-	-mcpu=cortex-m3 -Wall \
+	-mcpu=cortex-m3 -Wall -Wno-main \
 	-mthumb \
 	-DUSE_STDPERIPH_DRIVER \
 	-DSTM32F10X_MD
@@ -32,7 +32,8 @@ INCLUDE = -I./ \
 	  -I./FreeRTOSv9.0.0/FreeRTOS/Source/include \
 	  -I./CMSIS/CM3/DeviceSupport/ST/STM32F10x \
 	  -I./CMSIS/CM3/CoreSupport \
-	  -I./src/console
+	  -I./src/console \
+	  -I./src/console/rcli
 
 SRCS = 	./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
 	./stm32f10x_it.c \
@@ -49,6 +50,9 @@ SRCS = 	./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
 	./FreeRTOSv9.0.0/FreeRTOS/Source/timers.c \
 	./FreeRTOSv9.0.0/FreeRTOS/Source/portable/GCC/ARM_CM3/port.c \
 	./src/console/console.c \
+	./src/console/rcli/rcli.c \
+	./src/console/rcli/buf.c \
+	./src/syscalls.c \
 	./main.c
 
 OBJS=$(SRCS:.c=.o)
@@ -67,7 +71,7 @@ cleanall:
 	-find . -name '*.map' -exec rm {} \;
 
 clean:
-	rm -fv ./*.o ./src/*.o
+	rm -fv ./*.o ./src/*.o ./src/console/*.o ./src/console/rcli/*.o
 	rm -fv ./output/*.elf
 	rm -fv ./output/*.lst
 	rm -fv ./output/*.out

@@ -1,5 +1,3 @@
-#include <stdio.h>
-
 #include "stm32f10x.h"
 
 #include "FreeRTOS.h"
@@ -8,6 +6,7 @@
 #include "semphr.h"
 #include "timers.h"
 
+#include "main.h"
 #include "src/console/console.h"
 
 SemaphoreHandle_t semTickPulse;
@@ -16,35 +15,24 @@ void vTaskCode ( void *pvParameters)
 {
     for( ;; )
     {
-//        if(xSemaphoreTake(semTickPulse, 1) == pdTRUE)
-//        {
-//            GPIO_SetBits(GPIOC, GPIO_Pin_8);
-//        }
-//        else
-//        {
-//            GPIO_ResetBits(GPIOC, GPIO_Pin_8);
-//        }
-      vTaskDelay(10000);
+        vTaskDelay(1000);
     }
 }
 
 void main()
 {
-//    NVIC_SetVectorTable( NVIC_VectTab_FLASH, 0x0 );
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
 
-    // RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
-    // GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);
-
     ConsoleInit();
-    UsartDebugSendString((uint8_t*)"USART OK\r\n");
-    vSemaphoreCreateBinary(semTickPulse);
-    xSemaphoreTake(semTickPulse, 0);
+    PRINT_OS("\r\n");
+    PRINT_OS("Version HW 1.0\r\n");
+
+    ConsoleCliStart();
 
     xTaskCreate(
         vTaskCode,
         "Task",
-        configMINIMAL_STACK_SIZE,
+        256,
         NULL,
         tskIDLE_PRIORITY + 1,
         NULL
