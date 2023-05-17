@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #include "stm32f10x.h"
 
 #include "FreeRTOS.h"
@@ -8,6 +10,7 @@
 
 #include "main.h"
 #include "src/console/console.h"
+#include "src/hw_rev_adc/hw_rev_adc.h"
 
 SemaphoreHandle_t semTickPulse;
 
@@ -25,7 +28,10 @@ void main()
 
     ConsoleInit();
     PRINT_OS("\r\n");
-    PRINT_OS("Version HW 1.0\r\n");
+
+    HwRevAdcInit();
+    for(int x = 0; x < 10000; x++);
+    HwRevPrint();
 
     ConsoleCliStart();
 

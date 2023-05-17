@@ -33,13 +33,16 @@ INCLUDE = -I./ \
 	  -I./CMSIS/CM3/DeviceSupport/ST/STM32F10x \
 	  -I./CMSIS/CM3/CoreSupport \
 	  -I./src/console \
-	  -I./src/console/rcli
+	  -I./src/console/rcli \
+	  -I./src/hw_rev_adc
 
 SRCS = 	./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
 	./stm32f10x_it.c \
 	./STM32F10x_StdPeriph_Lib_V3.6.0/Libraries/STM32F10x_StdPeriph_Driver/src/stm32f10x_rcc.c \
 	./STM32F10x_StdPeriph_Lib_V3.6.0/Libraries/STM32F10x_StdPeriph_Driver/src/stm32f10x_gpio.c \
 	./STM32F10x_StdPeriph_Lib_V3.6.0/Libraries/STM32F10x_StdPeriph_Driver/src/stm32f10x_usart.c \
+	./STM32F10x_StdPeriph_Lib_V3.6.0/Libraries/STM32F10x_StdPeriph_Driver/src/stm32f10x_dma.c \
+	./STM32F10x_StdPeriph_Lib_V3.6.0/Libraries/STM32F10x_StdPeriph_Driver/src/stm32f10x_adc.c \
 	./STM32F10x_StdPeriph_Lib_V3.6.0/Libraries/STM32F10x_StdPeriph_Driver/src/misc.c \
 	./FreeRTOSv9.0.0/FreeRTOS/Source/croutine.c \
 	./FreeRTOSv9.0.0/FreeRTOS/Source/portable/MemMang/heap_4.c \
@@ -53,6 +56,7 @@ SRCS = 	./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
 	./src/console/rcli/rcli.c \
 	./src/console/rcli/buf.c \
 	./src/syscalls.c \
+	./src/hw_rev_adc/hw_rev_adc.c \
 	./main.c
 
 OBJS=$(SRCS:.c=.o)
