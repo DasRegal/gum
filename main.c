@@ -11,6 +11,8 @@
 #include "main.h"
 #include "src/console/console.h"
 #include "src/hw_rev_adc/hw_rev_adc.h"
+#include "src/hw_voltage_adc/hw_voltage_adc.h"
+#include "src/hw_adc.h"
 
 SemaphoreHandle_t semTickPulse;
 
@@ -29,9 +31,9 @@ void main()
     ConsoleInit();
     PRINT_OS("\r\n");
 
-    HwRevAdcInit();
-    for(int x = 0; x < 10000; x++);
+    HwAdcInit();
     HwRevPrint();
+    HwVoltPrint();
 
     ConsoleCliStart();
 

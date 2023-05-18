@@ -32,9 +32,11 @@ INCLUDE = -I./ \
 	  -I./FreeRTOSv9.0.0/FreeRTOS/Source/include \
 	  -I./CMSIS/CM3/DeviceSupport/ST/STM32F10x \
 	  -I./CMSIS/CM3/CoreSupport \
+	  -I./src \
 	  -I./src/console \
 	  -I./src/console/rcli \
-	  -I./src/hw_rev_adc
+	  -I./src/hw_rev_adc \
+	  -I./src/hw_voltage_adc
 
 SRCS = 	./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
 	./stm32f10x_it.c \
@@ -57,6 +59,8 @@ SRCS = 	./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
 	./src/console/rcli/buf.c \
 	./src/syscalls.c \
 	./src/hw_rev_adc/hw_rev_adc.c \
+	./src/hw_adc.c \
+	./src/hw_voltage_adc/hw_voltage_adc.c \
 	./main.c
 
 OBJS=$(SRCS:.c=.o)
