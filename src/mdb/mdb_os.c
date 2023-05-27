@@ -21,11 +21,16 @@ extern const uint8_t sw_version_bcd[2];
 extern void UsartDebugSendString(const char *pucBuffer);
 
 static void MdbBufSend(const uint16_t *pucBuffer, uint8_t len);
+static void MdbOsSelectItem(void);
+static void MdbOsSessionCancel(void);
+static void MdbOsVendApproved(void);
+static void MdbOsVendDenied(void);
 static void MdbOsSetupSeq(EventBits_t flags;);
 
 QueueHandle_t     fdBuferMdbRec;
 SemaphoreHandle_t mdb_transfer_sem;
 SemaphoreHandle_t mdb_start_rx_sem;
+SemaphoreHandle_t mdb_poll_sem;
 EventGroupHandle_t xCreatedEventGroup;
 EventGroupHandle_t xSetupSeqEg; 
 
@@ -40,15 +45,15 @@ void MdbDelay()
 #define MDB_OS_ACK_FLAG         0b0001
 #define MDB_OS_TX_READY_FLAG    0b0010
 
-#define MDB_OS_IS_SETUP_FLAG    0b0001
-#define MDB_OS_SETUP_1_FLAG     0b0010
-#define MDB_OS_SETUP_2_FLAG     0b0100
-#define MDB_OS_SETUP_3_FLAG     0b1000
+#define MDB_OS_IS_SETUP_FLAG    (1)
+#define MDB_OS_SETUP_1_FLAG     (1 << 1)
+#define MDB_OS_SETUP_2_FLAG     (1 << 2)
+#define MDB_OS_SETUP_3_FLAG     (1 << 3)
+#define MDB_OS_SETUP_4_FLAG     (1 << 4)
+#define MDB_OS_SETUP_5_FLAG     (1 << 5)
 
 void vTaskMdbRecBuf ( void *pvParameters)
 {
-    // uint8_t len = 0;
-
     uint16_t ch;
     mdb_ret_resp_t resp;
     QueueHandle_t fdBuferMdbRec;
@@ -56,8 +61,6 @@ void vTaskMdbRecBuf ( void *pvParameters)
 
     for( ;; )
     {
-        // xSemaphoreTake(mdb_start_rx_sem, portMAX_DELAY);
-
         if (xQueueReceive(fdBuferMdbRec, &ch, portMAX_DELAY) == pdPASS)
         {
             resp = MdbReceiveChar(ch);
@@ -82,22 +85,6 @@ void vTaskMdbRecBuf ( void *pvParameters)
                     break;
             }
         }
-
-
-        // len = MDB_MAX_BUF_LEN - DMA_GetCurrDataCounter(DMA1_Channel6); 
-        // if (MdbGetRxCh(len - 1) & 0x100)
-        // {
-        //     DMA_Cmd(DMA1_Channel6, DISABLE);
-        //     DMA_SetCurrDataCounter(DMA1_Channel6, MDB_MAX_BUF_LEN);
-        //     DMA_Cmd(DMA1_Channel6, ENABLE);
-        //     // vTaskDelay(1);
-        //     MdbParseData(len);
-        //     MdbClearRx(len - 1);
-        //     xSemaphoreGive(mdb_transfer_sem);
-        //     continue;
-        // }
-        // xSemaphoreGive(mdb_start_rx_sem);
-        // vTaskDelay(5);
     }
 }
 
@@ -125,32 +112,49 @@ void vTaskMdbPoll ( void *pvParameters)
         // {
         //     xEventGroupClearBits(xCreatedEventGroup, MDB_OS_TX_READY_FLAG);
         // }
+        if (xSemaphoreTake(mdb_poll_sem, 0) == pdTRUE)
+        {
+            MdbPollCmd();
+            continue;
+        }
 
         flags = xEventGroupGetBits(xSetupSeqEg);
-        if (flags & MDB_OS_IS_SETUP_FLAG)
+        if (flags)
         {
+            xEventGroupClearBits(xSetupSeqEg, flags);
+            flags = xEventGroupSetBits(xSetupSeqEg, (flags << 1));
             MdbOsSetupSeq(flags);
+            xSemaphoreGive(mdb_poll_sem);
+            continue;
         }
-        else
-        {
-            vTaskDelay(MDB_POLL_TIME);
-            MdbPollCmd();
-        }
+        
+        vTaskDelay(MDB_POLL_TIME);
+        MdbPollCmd();
+        continue;
     }
 }
 
 void MdbOsInit(void)
 {
-    MdbInit(MdbBufSend);
+    mdv_dev_init_struct_t mdb_dev_struct;
+
+    mdb_dev_struct.send_callback        = MdbBufSend;
+    mdb_dev_struct.select_item_cb       = MdbOsSelectItem;
+    mdb_dev_struct.session_cancel_cb    = MdbOsSessionCancel;
+    mdb_dev_struct.vend_approved_cb     = MdbOsVendApproved;
+    mdb_dev_struct.vend_denied_cb       = MdbOsVendDenied;
+    MdbInit(mdb_dev_struct);
 
     vSemaphoreCreateBinary(mdb_transfer_sem);
     vSemaphoreCreateBinary(mdb_start_rx_sem);
-    // xSemaphoreTake(mdb_start_rx_sem, 0);
+    vSemaphoreCreateBinary(mdb_poll_sem);
+    
+    xSemaphoreTake(mdb_poll_sem, 0);
 
     fdBuferMdbRec = xQueueCreate(256, sizeof(uint16_t));
     xCreatedEventGroup = xEventGroupCreate();
     xSetupSeqEg = xEventGroupCreate();
-    xEventGroupSetBits(xSetupSeqEg, MDB_OS_IS_SETUP_FLAG | MDB_OS_SETUP_1_FLAG);
+    xEventGroupSetBits(xSetupSeqEg, MDB_OS_IS_SETUP_FLAG);
     MdbUsartInit();
     
     xTaskCreate(
@@ -178,9 +182,17 @@ static void MdbOsSetupSeq(EventBits_t flags)
 
     if (flags & MDB_OS_SETUP_1_FLAG)
     {
-        xEventGroupClearBits(xSetupSeqEg, MDB_OS_SETUP_1_FLAG);
-        xEventGroupSetBits(xSetupSeqEg, MDB_OS_SETUP_2_FLAG);
-        buf[0] = MDB_LEVEL_1;
+        // xEventGroupClearBits(xSetupSeqEg, MDB_OS_SETUP_1_FLAG);
+        // xEventGroupSetBits(xSetupSeqEg, MDB_OS_SETUP_2_FLAG);
+        MdbResetCmd();
+        return;
+    }
+
+    if (flags & MDB_OS_SETUP_2_FLAG)
+    {
+        // xEventGroupClearBits(xSetupSeqEg, MDB_OS_SETUP_2_FLAG);
+        // xEventGroupSetBits(xSetupSeqEg, MDB_OS_SETUP_3_FLAG);
+        buf[0] = MdbGetLevel();
         buf[1] = 0;
         buf[2] = 0;
         buf[3] = 0;
@@ -188,10 +200,10 @@ static void MdbOsSetupSeq(EventBits_t flags)
         return;
     }
 
-    if (flags & MDB_OS_SETUP_2_FLAG)
+    if (flags & MDB_OS_SETUP_3_FLAG)
     {
-        xEventGroupClearBits(xSetupSeqEg, MDB_OS_SETUP_2_FLAG);
-        xEventGroupSetBits(xSetupSeqEg, MDB_OS_SETUP_3_FLAG);
+        // xEventGroupClearBits(xSetupSeqEg, MDB_OS_SETUP_3_FLAG);
+        // xEventGroupSetBits(xSetupSeqEg, MDB_OS_SETUP_4_FLAG);
         buf[0] = 0;
         buf[1] = 100;   /* Max price */
         buf[2] = 0;
@@ -200,14 +212,22 @@ static void MdbOsSetupSeq(EventBits_t flags)
         return;
     }
 
-    if (flags & MDB_OS_SETUP_3_FLAG)
+    if (flags & MDB_OS_SETUP_4_FLAG)
     {
-        xEventGroupClearBits(xSetupSeqEg, MDB_OS_SETUP_3_FLAG | MDB_OS_IS_SETUP_FLAG);
+        // xEventGroupClearBits(xSetupSeqEg, MDB_OS_SETUP_4_FLAG);
+        // xEventGroupSetBits(xSetupSeqEg, MDB_OS_SETUP_5_FLAG);
         memcpy(buf,               MDB_VMC_MANUFACTURE_CODE, 3);
         memcpy(buf + 3,           serial_number,            12);
         memcpy(buf + 3 + 12,      model_number,             12);
         memcpy(buf + 3 + 12 + 12, sw_version_bcd,           2);
         MdbExpansionCmd(MDB_EXP_REQ_ID_SUBCMD, buf);
+        return;
+    }
+
+    if (flags & MDB_OS_SETUP_5_FLAG)
+    {
+        xEventGroupClearBits(xSetupSeqEg, MDB_OS_SETUP_5_FLAG);
+        MdbReaderCmd(MDB_READER_ENABLE_SUBCMD, NULL);
         return;
     }
 }
@@ -220,6 +240,26 @@ static void MdbBufSend(const uint16_t *pucBuffer, uint8_t len)
     DMA_Cmd(DMA1_Channel7, ENABLE);
     // vTaskDelay(5);
     USART_DMACmd(USART2, USART_DMAReq_Tx, ENABLE);
+}
+
+static void MdbOsSelectItem(void)
+{
+
+}
+
+static void MdbOsSessionCancel(void)
+{
+
+}
+
+static void MdbOsVendApproved(void)
+{
+    
+}
+
+static void MdbOsVendDenied(void)
+{
+    
 }
 
 void DMA1_Channel7_IRQHandler(void)

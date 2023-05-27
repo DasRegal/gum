@@ -57,10 +57,19 @@ typedef enum
     MDB_RET_IDLE,
     MDB_RET_REPEAT
 } mdb_ret_resp_t;
+
+typedef struct
+{
+    void            (*send_callback)(const uint16_t*, uint8_t);
+    void            (*select_item_cb)(void);
+    void            (*session_cancel_cb)(void);
+    void            (*vend_approved_cb)(void);
+    void            (*vend_denied_cb)(void);
+} mdv_dev_init_struct_t;
 //void MdbPrint(void);
 //void MdbBufSend(const uint16_t *pucBuffer, uint8_t len);
 
-void MdbInit(void *send_callback);
+void MdbInit(mdv_dev_init_struct_t dev_struct);
 void MdbSetSlaveAddr(uint8_t addr);
 void MdbResetCmd(void);
 void MdbSetupCmd(uint8_t subcmd, uint8_t * data);
@@ -70,10 +79,11 @@ void MdbReaderCmd(uint8_t subcmd, uint8_t * data);
 void MdbRevalueCmd(uint8_t subcmd, uint8_t * data);
 void MdbExpansionCmd(uint8_t subcmd, uint8_t * data);
 void MdbAckCmd(void);
+mdb_level_t MdbGetLevel(void);
 // void MdbGetCh(uint16_t ch);
 void MdbUsartInit(void);
 uint16_t MdbGetRxCh(uint8_t idx);
-void MdbClearRx(uint8_t idx);
+// void MdbClearRx(uint8_t idx);
 mdb_ret_resp_t MdbReceiveChar(uint16_t ch);
 
 #endif /* _MDB_H */

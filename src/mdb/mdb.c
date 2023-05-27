@@ -25,18 +25,41 @@
 #define MDB_REVALUE_CMD             5
 #define MDB_EXPANSION_CMD           7
 
-#define MDB_CURRENCY_CODE_RUB_1     0x440
-#define MDB_CURRENCY_CODE_RUB_2     0x443
-#define MDB_CURRENCY_CODE_RUB_3     0x431
+#define MDB_POLL_JUST_RESET_RESP     0x00
+#define MDB_POLL_CONFIG_RESP         0x01
+#define MDB_POLL_DISPLAY_REQ_RESP    0x02
+#define MDB_POLL_BEGIN_SESSION_RESP  0x03
+#define MDB_POLL_SESS_CANCEL_RESP    0x04
+#define MDB_POLL_VEND_APPROVED_RESP  0x05
+#define MDB_POLL_VEND_DENIED_RESP    0x06
+#define MDB_POLL_END_SESSION_RESP    0x07
+#define MDB_POLL_CANCELLED_RESP      0x08
+#define MDB_POLL_PERIPH_ID_RESP      0x09
+#define MDB_POLL_ERROR_RESP          0x0A
+#define MDB_POLL_OUT_OF_SEQ_RESP     0x0B
+#define MDB_POLL_REVAL_APPR_RESP     0x0D
+#define MDB_POLL_REVAL_DENIED_RESP   0x0E
+#define MDB_POLL_REVAL_LIMIT_RESP    0x0F
+#define MDB_POLL_TIME_DATA_RESP      0x11
+#define MDB_POLL_DAT_ENTRY_REQ_RESP  0x12
+#define MDB_POLL_DAT_ENT_CANCEL_RESP 0x13
+
+#define MDB_CURRENCY_CODE_RUB_1     0x643
+#define MDB_CURRENCY_CODE_RUB_2     0x810
 
 extern void UsartDebugSendString(const char *pucBuffer);
 
 static void MdbSendCmd(uint8_t cmd, uint8_t subcmd, uint8_t * data, uint8_t len);
-static void MdbSendResponce(uint8_t resp);
+// static void MdbSendResponce(uint8_t resp);
 static uint16_t MdbCalcChk(uint16_t * buf, uint8_t len);
 static bool MdbIsValidateChk(uint16_t * buf, uint8_t len);
 static void MdbSendData(uint16_t * buf, uint8_t len);
 static mdb_ret_resp_t MdbParseData(uint8_t len);
+static void MdbParseResponse(void);
+static void MdbSelectItem(void);
+static void MdbSessionCancel(void);
+static void MdbVendApproved(void);
+static void MdbVendDenied(void);
 //static void MdbReceiveData(uint16_t * buf, uint8_t len);
 
 typedef enum
@@ -54,6 +77,20 @@ typedef enum
 
 typedef struct
 {
+    mdb_level_t     level;
+    uint16_t        country_code;
+    uint8_t         scale_factor;
+    uint8_t         decimal_places;
+    uint8_t         max_resp_time;
+    uint8_t         misc;
+    uint8_t         manufact_code[3];
+    uint8_t         serial_num[12];
+    uint8_t         model_num[12];
+    uint16_t        sw_version;
+} mdb_dev_slave_t;
+
+typedef struct
+{
     uint8_t         addr;
     mdb_level_t     level;
     bool            is_expansion_en;
@@ -62,19 +99,30 @@ typedef struct
     uint16_t        tx_data[MDB_MAX_BUF_LEN];
     uint8_t         send_cmd;
     uint8_t         send_subcmd;
-    void            (*send_callback)(uint16_t*, uint8_t);
+    void            (*send_callback)(const uint16_t*, uint8_t);
+    void            (*select_item_cb)(void);
+    void            (*session_cancel_cb)(void);
+    void            (*vend_approved_cb)(void);
+    void            (*vend_denied_cb)(void);
+    mdb_dev_slave_t dev_slave;
+    mdb_state_t     state;
 } mdb_dev_t;
 
 static mdb_dev_t mdb_dev;
 
 
-void MdbInit(void *send_callback)
+void MdbInit(mdv_dev_init_struct_t dev_struct)
 {
-    mdb_dev.level = MDB_LEVEL_1;
     mdb_dev.is_expansion_en = false;
-    mdb_dev.rx_len = 0;
-    MdbSetSlaveAddr(MDB_CASHLESS_DEV_1_ADDR);
-    mdb_dev.send_callback = send_callback;
+    mdb_dev.send_callback   = dev_struct.send_callback;
+    mdb_dev.select_item_cb  = dev_struct.select_item_cb;
+    mdb_dev.session_cancel_cb = dev_struct.session_cancel_cb;
+    mdb_dev.vend_approved_cb= dev_struct.vend_approved_cb;
+    mdb_dev.vend_denied_cb  = dev_struct.vend_denied_cb;
+    mdb_dev.rx_len          = 0;
+    mdb_dev.level           = MDB_LEVEL_2;
+    mdb_dev.state           = MDB_STATE_INACTIVE;
+    mdb_dev.addr            = MDB_CASHLESS_DEV_1_ADDR;
 }
 
 void MdbSetSlaveAddr(uint8_t addr)
@@ -251,9 +299,12 @@ static void MdbSendCmd(uint8_t cmd, uint8_t subcmd, uint8_t * data, uint8_t len)
         mdb_dev.tx_data[1] = subcmd;
     }
 
-    for(uint8_t i = 1; i < len; i++)
+    if (data != NULL)
     {
-        mdb_dev.tx_data[i + 1] = (uint16_t)(data[i - 1] & 0x00FF);
+        for(uint8_t i = 1; i < len; i++)
+        {
+            mdb_dev.tx_data[i + 1] = (uint16_t)(data[i - 1] & 0x00FF);
+        }
     }
 
     if (len > 1)
@@ -269,11 +320,11 @@ static void MdbSendCmd(uint8_t cmd, uint8_t subcmd, uint8_t * data, uint8_t len)
 
 }
 
-static void MdbSendResponce(uint8_t resp)
-{
-    mdb_dev.tx_data[0] = resp;
-    MdbSendData(mdb_dev.tx_data, 1);
-}
+// static void MdbSendResponce(uint8_t resp)
+// {
+//     mdb_dev.tx_data[0] = resp;
+//     MdbSendData(mdb_dev.tx_data, 1);
+// }
 
 static uint16_t MdbCalcChk(uint16_t * buf, uint8_t len)
 {
@@ -315,10 +366,10 @@ uint16_t MdbGetRxCh(uint8_t idx)
     return mdb_dev.rx_data[idx];
 }
 
-void MdbClearRx(uint8_t idx)
-{
-    mdb_dev.rx_data[idx] &= ~0x100;
-}
+// void MdbClearRx(uint8_t idx)
+// {
+//     mdb_dev.rx_data[idx] &= ~0x100;
+// }
 
 // static void MdbReceiveData(uint16_t * buf, uint8_t len)
 // {
@@ -368,26 +419,134 @@ static mdb_ret_resp_t MdbParseData(uint8_t len)
 
     if (MdbIsValidateChk(mdb_dev.rx_data, mdb_dev.rx_len))
     {
+        MdbParseResponse();
         return MDB_RET_DATA;
-        // mdb_dev.tx_data[0] = MDB_ACK;
-        // MdbSendData(mdb_dev.tx_data, 1);
-
-        // if(mdb_dev.rx_data[0] == MDB_VEND_CMD)
-        // {
-        //     uint8_t bbbb[4];
-        //     bbbb[0] = 0;
-        //     bbbb[1] = 10;
-        //     bbbb[2] = 0;
-        //     bbbb[3] = 1;
-        //     MdbVendCmd(MDB_VEND_REQ_SUBCMD, bbbb);
-        // }
     }
     else
     {
         return MDB_RET_REPEAT;
     }
 }
-volatile uint16_t bbuf[64];
+
+static void MdbParseResponse(void)
+{
+    uint8_t resp_header = mdb_dev.rx_data[0];
+
+    switch(resp_header)
+    {
+        case MDB_POLL_JUST_RESET_RESP:
+            {
+                mdb_dev.state = MDB_STATE_DISABLED;
+                break;
+            }
+        case MDB_POLL_CONFIG_RESP:
+            {
+                mdb_dev.dev_slave.country_code = (mdb_dev.rx_data[2] << 8) + mdb_dev.rx_data[3];
+                if (mdb_dev.dev_slave.country_code != MDB_CURRENCY_CODE_RUB_1 ||
+                    mdb_dev.dev_slave.country_code != MDB_CURRENCY_CODE_RUB_1)
+                {
+                    mdb_dev.state = MDB_STATE_INACTIVE;
+                    return;
+                }
+                mdb_dev.dev_slave.level             = mdb_dev.rx_data[1];
+                mdb_dev.dev_slave.scale_factor      = mdb_dev.rx_data[4];
+                mdb_dev.dev_slave.decimal_places    = mdb_dev.rx_data[5];
+                mdb_dev.dev_slave.max_resp_time     = mdb_dev.rx_data[6];
+                mdb_dev.dev_slave.misc              = mdb_dev.rx_data[7];
+
+                if (mdb_dev.level > mdb_dev.dev_slave.level)
+                {
+                    MdbSetSlaveAddr(mdb_dev.dev_slave.level);
+                }
+
+                mdb_dev.state = MDB_STATE_ENABLED;
+                break;
+            }
+        case MDB_POLL_DISPLAY_REQ_RESP:
+            break;
+        case MDB_POLL_BEGIN_SESSION_RESP:
+            {
+                mdb_dev.state = MDB_STATE_SESSION_IDLE;
+                MdbSelectItem();
+                break;
+            }
+        case MDB_POLL_SESS_CANCEL_RESP:
+            {
+                MdbSessionCancel();
+                break;
+            }
+        case MDB_POLL_VEND_APPROVED_RESP:
+            {
+                MdbVendApproved();
+                break;
+            }
+        case MDB_POLL_VEND_DENIED_RESP:
+            {
+                MdbVendDenied();
+                break;
+            }
+        case MDB_POLL_END_SESSION_RESP:
+            {
+                mdb_dev.state = MDB_STATE_ENABLED;
+                //TODO
+                // Check max non-response time!
+                break;
+            }
+        case MDB_POLL_CANCELLED_RESP:
+            {
+                break;
+            }
+        case MDB_POLL_PERIPH_ID_RESP:
+            {
+                for (uint8_t i = 0; i < 3; i++)
+                    mdb_dev.dev_slave.manufact_code[i] = mdb_dev.rx_data[i + 1];
+                for (uint8_t i = 0; i < 12; i++)
+                    mdb_dev.dev_slave.serial_num[i] = mdb_dev.rx_data[i + 1 + 3];
+                for (uint8_t i = 0; i < 12; i++)
+                    mdb_dev.dev_slave.model_num[i] = mdb_dev.rx_data[i + 1 + 3 + 12];
+                mdb_dev.dev_slave.sw_version = (mdb_dev.rx_data[28] << 8) + mdb_dev.rx_data[29];
+                break;
+            }
+    }
+}
+
+static void MdbSelectItem(void)
+{
+    if (mdb_dev.select_item_cb == NULL)
+        return;
+
+    mdb_dev.select_item_cb();
+}
+
+static void MdbSessionCancel(void)
+{
+    if (mdb_dev.session_cancel_cb == NULL)
+        return;
+
+    mdb_dev.session_cancel_cb();
+}
+
+static void MdbVendApproved(void)
+{
+    if (mdb_dev.vend_approved_cb == NULL)
+        return;
+
+    mdb_dev.vend_approved_cb();
+}
+
+static void MdbVendDenied(void)
+{
+    if (mdb_dev.vend_denied_cb == NULL)
+        return;
+
+    mdb_dev.vend_denied_cb();
+}
+
+mdb_level_t MdbGetLevel(void)
+{
+    return mdb_dev.level;
+}
+
 void MdbUsartInit(void)
 {
     USART_InitTypeDef USART_InitStructure;
