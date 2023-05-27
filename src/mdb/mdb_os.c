@@ -9,6 +9,7 @@
 #include "queue.h"
 #include "timers.h"
 #include "semphr.h"
+#include "event_groups.h"
 
 #include "mdb.h"
 #include "serial.h"
@@ -20,11 +21,13 @@ extern const uint8_t sw_version_bcd[2];
 extern void UsartDebugSendString(const char *pucBuffer);
 
 static void MdbBufSend(const uint16_t *pucBuffer, uint8_t len);
-static void MdbOsSetupSeq(void);
+static void MdbOsSetupSeq(EventBits_t flags;);
 
 QueueHandle_t     fdBuferMdbRec;
 SemaphoreHandle_t mdb_transfer_sem;
 SemaphoreHandle_t mdb_start_rx_sem;
+EventGroupHandle_t xCreatedEventGroup;
+EventGroupHandle_t xSetupSeqEg; 
 
 void MdbDelay()
 {
@@ -34,11 +37,20 @@ void MdbDelay()
     }
 }
 
+#define MDB_OS_ACK_FLAG         0b0001
+#define MDB_OS_TX_READY_FLAG    0b0010
+
+#define MDB_OS_IS_SETUP_FLAG    0b0001
+#define MDB_OS_SETUP_1_FLAG     0b0010
+#define MDB_OS_SETUP_2_FLAG     0b0100
+#define MDB_OS_SETUP_3_FLAG     0b1000
+
 void vTaskMdbRecBuf ( void *pvParameters)
 {
-    uint8_t len = 0;
+    // uint8_t len = 0;
 
     uint16_t ch;
+    mdb_ret_resp_t resp;
     QueueHandle_t fdBuferMdbRec;
     fdBuferMdbRec = (QueueHandle_t*)pvParameters;
 
@@ -48,9 +60,26 @@ void vTaskMdbRecBuf ( void *pvParameters)
 
         if (xQueueReceive(fdBuferMdbRec, &ch, portMAX_DELAY) == pdPASS)
         {
-            if (MdbReceiveChar(ch))
+            resp = MdbReceiveChar(ch);
+            switch(resp)
             {
-                
+                case MDB_RET_IN_PROG:
+                    continue;
+                    break;
+                case MDB_RET_DATA:
+                    xEventGroupSetBits(xCreatedEventGroup, MDB_OS_ACK_FLAG);
+                    xSemaphoreGive(mdb_transfer_sem);
+                    continue;
+                    break;
+                case MDB_RET_IDLE:
+                    // xEventGroupSetBits(xCreatedEventGroup, MDB_OS_TX_READY_FLAG);
+                    xSemaphoreGive(mdb_transfer_sem);
+                    continue;
+                    break;
+                case MDB_RET_REPEAT:
+                    break;
+                default:
+                    break;
             }
         }
 
@@ -74,22 +103,38 @@ void vTaskMdbRecBuf ( void *pvParameters)
 
 void vTaskMdbPoll ( void *pvParameters)
 {
-    uint8_t state = 0;
+    // uint8_t state = 0;
+    EventBits_t flags;
     for( ;; )
     {
-        vTaskDelay(100);
+        xSemaphoreTake(mdb_transfer_sem, portMAX_DELAY);
 
-        switch(state)
+        flags = xEventGroupGetBits(xCreatedEventGroup);
+
+        if (flags & MDB_OS_ACK_FLAG)
         {
-            case 0:
-                MdbOsSetupSeq();
-                xSemaphoreGive(mdb_transfer_sem);
-                state = 1;
-                break;
-            case 1:
-                xSemaphoreTake(mdb_transfer_sem, portMAX_DELAY);
-                MdbPollCmd();
-                break;
+            xEventGroupClearBits(xCreatedEventGroup, MDB_OS_ACK_FLAG);
+            MdbAckCmd();
+            vTaskDelay(5);
+            xSemaphoreGive(mdb_transfer_sem);
+            //xEventGroupSetBits(xCreatedEventGroup, MDB_OS_TX_READY_FLAG);
+            continue;
+        }
+
+        // if (flags & MDB_OS_TX_READY_FLAG)
+        // {
+        //     xEventGroupClearBits(xCreatedEventGroup, MDB_OS_TX_READY_FLAG);
+        // }
+
+        flags = xEventGroupGetBits(xSetupSeqEg);
+        if (flags & MDB_OS_IS_SETUP_FLAG)
+        {
+            MdbOsSetupSeq(flags);
+        }
+        else
+        {
+            vTaskDelay(MDB_POLL_TIME);
+            MdbPollCmd();
         }
     }
 }
@@ -100,9 +145,12 @@ void MdbOsInit(void)
 
     vSemaphoreCreateBinary(mdb_transfer_sem);
     vSemaphoreCreateBinary(mdb_start_rx_sem);
-    xSemaphoreTake(mdb_start_rx_sem, 0);
+    // xSemaphoreTake(mdb_start_rx_sem, 0);
 
     fdBuferMdbRec = xQueueCreate(256, sizeof(uint16_t));
+    xCreatedEventGroup = xEventGroupCreate();
+    xSetupSeqEg = xEventGroupCreate();
+    xEventGroupSetBits(xSetupSeqEg, MDB_OS_IS_SETUP_FLAG | MDB_OS_SETUP_1_FLAG);
     MdbUsartInit();
     
     xTaskCreate(
@@ -124,30 +172,44 @@ void MdbOsInit(void)
     );
 }
 
-static void MdbOsSetupSeq(void)
+static void MdbOsSetupSeq(EventBits_t flags)
 {
     uint8_t buf[36];
 
-    buf[0] = MDB_LEVEL_1;
-    buf[1] = 0;
-    buf[2] = 0;
-    buf[3] = 0;
-    xSemaphoreTake(mdb_transfer_sem, portMAX_DELAY);
-    MdbSetupCmd(MDB_SETUP_CONF_DATA_SUBCMD, buf);
+    if (flags & MDB_OS_SETUP_1_FLAG)
+    {
+        xEventGroupClearBits(xSetupSeqEg, MDB_OS_SETUP_1_FLAG);
+        xEventGroupSetBits(xSetupSeqEg, MDB_OS_SETUP_2_FLAG);
+        buf[0] = MDB_LEVEL_1;
+        buf[1] = 0;
+        buf[2] = 0;
+        buf[3] = 0;
+        MdbSetupCmd(MDB_SETUP_CONF_DATA_SUBCMD, buf);
+        return;
+    }
 
-    buf[0] = 0;
-    buf[1] = 100;   /* Max price */
-    buf[2] = 0;
-    buf[3] = 0;     /* Min price */
-    xSemaphoreTake(mdb_transfer_sem, portMAX_DELAY);
-    MdbSetupCmd(MDB_SETUP_PRICE_SUBCMD, buf);
+    if (flags & MDB_OS_SETUP_2_FLAG)
+    {
+        xEventGroupClearBits(xSetupSeqEg, MDB_OS_SETUP_2_FLAG);
+        xEventGroupSetBits(xSetupSeqEg, MDB_OS_SETUP_3_FLAG);
+        buf[0] = 0;
+        buf[1] = 100;   /* Max price */
+        buf[2] = 0;
+        buf[3] = 0;     /* Min price */
+        MdbSetupCmd(MDB_SETUP_PRICE_SUBCMD, buf);
+        return;
+    }
 
-    memcpy(buf,               MDB_VMC_MANUFACTURE_CODE, 3);
-    memcpy(buf + 3,           serial_number,            12);
-    memcpy(buf + 3 + 12,      model_number,             12);
-    memcpy(buf + 3 + 12 + 12, sw_version_bcd,           2);
-    xSemaphoreTake(mdb_transfer_sem, portMAX_DELAY);
-    MdbExpansionCmd(MDB_EXP_REQ_ID_SUBCMD, buf);
+    if (flags & MDB_OS_SETUP_3_FLAG)
+    {
+        xEventGroupClearBits(xSetupSeqEg, MDB_OS_SETUP_3_FLAG | MDB_OS_IS_SETUP_FLAG);
+        memcpy(buf,               MDB_VMC_MANUFACTURE_CODE, 3);
+        memcpy(buf + 3,           serial_number,            12);
+        memcpy(buf + 3 + 12,      model_number,             12);
+        memcpy(buf + 3 + 12 + 12, sw_version_bcd,           2);
+        MdbExpansionCmd(MDB_EXP_REQ_ID_SUBCMD, buf);
+        return;
+    }
 }
 
 static void MdbBufSend(const uint16_t *pucBuffer, uint8_t len)
@@ -156,7 +218,7 @@ static void MdbBufSend(const uint16_t *pucBuffer, uint8_t len)
     DMA_SetCurrDataCounter(DMA1_Channel7, len);
     DMA_ITConfig(DMA1_Channel7, DMA_IT_TC, ENABLE);
     DMA_Cmd(DMA1_Channel7, ENABLE);
-    vTaskDelay(5);
+    // vTaskDelay(5);
     USART_DMACmd(USART2, USART_DMAReq_Tx, ENABLE);
 }
 
@@ -174,7 +236,7 @@ void DMA1_Channel7_IRQHandler(void)
     }
 }
 
-void USART2_IRQHandler(void)  // GPRS модем
+void USART2_IRQHandler(void)
 {
     if(USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)
     {
@@ -183,9 +245,5 @@ void USART2_IRQHandler(void)  // GPRS модем
         USART_ClearITPendingBit(USART2, USART_IT_RXNE);
         ch = (uint16_t)USART_ReceiveData(USART2);
         xQueueSendFromISR(fdBuferMdbRec, &ch, NULL);
-        // if (ch & 0x100)
-        // {
-        //     xSemaphoreGiveFromISR(mdb_start_rx_sem, NULL);
-        // }
     }
 }

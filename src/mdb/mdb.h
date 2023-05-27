@@ -7,6 +7,10 @@
 
 #define MDB_MAX_BUF_LEN             36
 
+#define MDB_POLL_TIME               125     /* 25-200 ms. Recmmended 125-200 ms. */
+#define MDB_T_RESPONSE_TIMEOUT      5       /* ms */
+#define MDB_T_RESET_TIMEOUT         10      /* s */
+
 /* MDB_SETUP_CMD */
 #define MDB_SETUP_CONF_DATA_SUBCMD  0x00
 #define MDB_SETUP_PRICE_SUBCMD      0x01
@@ -45,6 +49,14 @@ typedef enum
     MDB_LEVEL_2,
     MDB_LEVEL_3
 } mdb_level_t;
+
+typedef enum
+{
+    MDB_RET_DATA,
+    MDB_RET_IN_PROG,
+    MDB_RET_IDLE,
+    MDB_RET_REPEAT
+} mdb_ret_resp_t;
 //void MdbPrint(void);
 //void MdbBufSend(const uint16_t *pucBuffer, uint8_t len);
 
@@ -57,11 +69,11 @@ void MdbVendCmd(uint8_t subcmd, uint8_t * data);
 void MdbReaderCmd(uint8_t subcmd, uint8_t * data);
 void MdbRevalueCmd(uint8_t subcmd, uint8_t * data);
 void MdbExpansionCmd(uint8_t subcmd, uint8_t * data);
+void MdbAckCmd(void);
 // void MdbGetCh(uint16_t ch);
 void MdbUsartInit(void);
-void MdbParseData(uint8_t);
 uint16_t MdbGetRxCh(uint8_t idx);
 void MdbClearRx(uint8_t idx);
-uint8_t MdbReceiveChar(uint16_t ch);
+mdb_ret_resp_t MdbReceiveChar(uint16_t ch);
 
 #endif /* _MDB_H */

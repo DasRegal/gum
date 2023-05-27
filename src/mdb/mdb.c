@@ -17,10 +17,6 @@
 
 #define MDB_MODE_BIT                0x100
 
-#define MDB_POLL_TIME               25      /* 25-200 ms */
-#define MDB_T_RESPONSE_TIMEOUT      5       /* ms */
-#define MDB_T_RESET_TIMEOUT         10      /* s */
-
 #define MDB_RESET_CMD               0
 #define MDB_SETUP_CMD               1
 #define MDB_POLL_CMD                2
@@ -40,6 +36,7 @@ static void MdbSendResponce(uint8_t resp);
 static uint16_t MdbCalcChk(uint16_t * buf, uint8_t len);
 static bool MdbIsValidateChk(uint16_t * buf, uint8_t len);
 static void MdbSendData(uint16_t * buf, uint8_t len);
+static mdb_ret_resp_t MdbParseData(uint8_t len);
 //static void MdbReceiveData(uint16_t * buf, uint8_t len);
 
 typedef enum
@@ -236,6 +233,12 @@ void MdbExpansionCmd(uint8_t subcmd, uint8_t * data)
     MdbSendCmd(MDB_EXPANSION_CMD, subcmd, data, len);
 }
 
+void MdbAckCmd(void)
+{
+    mdb_dev.tx_data[0] = MDB_ACK;
+    MdbSendData(mdb_dev.tx_data, 1);
+}
+
 static void MdbSendCmd(uint8_t cmd, uint8_t subcmd, uint8_t * data, uint8_t len)
 {
     mdb_dev.send_cmd    = cmd;
@@ -326,43 +329,48 @@ void MdbClearRx(uint8_t idx)
 //     memcpy(mdb_dev.rx_data, buf, len);
 // }
 
-uint8_t MdbReceiveChar(uint16_t ch)
+mdb_ret_resp_t MdbReceiveChar(uint16_t ch)
 {
+    mdb_ret_resp_t ret = MDB_RET_IN_PROG;
+
     mdb_dev.rx_data[mdb_dev.rx_len] = ch;
     mdb_dev.rx_len++;
 
     if (ch & 0x100)
     {
-        MdbParseData(mdb_dev.rx_len);
+        ret = MdbParseData(mdb_dev.rx_len);
         mdb_dev.rx_len = 0;
-
-        return 1;
     }
 
-    return 0;
+    return ret;
 }
 
-void MdbParseData(uint8_t len)
+static mdb_ret_resp_t MdbParseData(uint8_t len)
 {
+    mdb_ret_resp_t ret = MDB_RET_IDLE;
+
     mdb_dev.rx_len = len;
     if (mdb_dev.rx_len == 1)
     {
         switch(mdb_dev.rx_data[0] & 0xFF)
         {
             case MDB_ACK:
-                break;
-            case MDB_RET:
+                ret = MDB_RET_IDLE;
                 break;
             case MDB_NAK:
+                ret = MDB_RET_IDLE;
                 break;
+            default:
+                ret = MDB_RET_IDLE;
         }
-        return;
+        return ret;
     }
 
     if (MdbIsValidateChk(mdb_dev.rx_data, mdb_dev.rx_len))
     {
-        mdb_dev.tx_data[0] = MDB_ACK;
-        MdbSendData(mdb_dev.tx_data, 1);
+        return MDB_RET_DATA;
+        // mdb_dev.tx_data[0] = MDB_ACK;
+        // MdbSendData(mdb_dev.tx_data, 1);
 
         // if(mdb_dev.rx_data[0] == MDB_VEND_CMD)
         // {
@@ -373,6 +381,10 @@ void MdbParseData(uint8_t len)
         //     bbbb[3] = 1;
         //     MdbVendCmd(MDB_VEND_REQ_SUBCMD, bbbb);
         // }
+    }
+    else
+    {
+        return MDB_RET_REPEAT;
     }
 }
 volatile uint16_t bbuf[64];
