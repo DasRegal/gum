@@ -6,6 +6,7 @@
 #include "main.h"
 #include "version.h"
 #include "buf.h"
+#include "mdb.h"
 
 extern void UsartDebugSendString(const char *pucBuffer);
 
@@ -164,6 +165,7 @@ char status_func_cmd(unsigned char args, void* argv)
 
 char help_func_cmd(unsigned char args, void* argv);
 char console_func_cmd(unsigned char args, void* argv);
+char mdb_func_cmd(unsigned char args, void* argv);
 
 typedef char (*cb_t)(unsigned char args, void* argv);
 typedef struct
@@ -178,6 +180,7 @@ rcli_cmd_t rcli_commands[] =
     { 3, (char*[]){ "cmd", "ddd", "q", NULL }, cmd_func_cmd },
     { 1, (char*[]){ "console", NULL}, console_func_cmd },
     { 1, (char*[]){ "echo", NULL}, echo_func_cmd },
+    { 1, (char*[]){ "mdb", NULL}, mdb_func_cmd },
     { 3, (char*[]){ "status", "set", "get", NULL}, status_func_cmd },
     { 1, (char*[]){ "help", NULL}, help_func_cmd },
     { 1, (char*[]){ "?", NULL}, help_func_cmd }
@@ -192,6 +195,36 @@ char help_func_cmd(unsigned char args, void* argv)
         sprintf(rcli_out_buf, "  %s\r\n", (char*)rcli_commands[i].argv[0]);
         RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
     }
+    return 0;
+}
+
+char mdb_func_cmd(unsigned char args, void* argv)
+{
+    uint16_t buf[63];
+    uint8_t  chk = 0;
+    uint8_t  idx = 0;
+
+    for(uint8_t i = 1; i < args; i++)
+    {
+        buf[i - 1] = (uint16_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * i, NULL, 16);
+    }
+
+    for( idx = 0; idx < args - 1; idx++)
+    {
+        chk += buf[idx] & 0xFF;
+    }
+    buf[idx] = chk;
+
+    for(uint8_t i = 0; i < args; i++)
+    {
+        sprintf(rcli_out_buf, "0x%x ", buf[i]);
+        RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+    }
+
+    sprintf(rcli_out_buf, "\r\n");
+    RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+
+    //MdbBufSend(buf, args);
     return 0;
 }
 

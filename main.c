@@ -13,6 +13,7 @@
 #include "src/hw_rev_adc/hw_rev_adc.h"
 #include "src/hw_voltage_adc/hw_voltage_adc.h"
 #include "src/hw_adc.h"
+#include "src/mdb/mdb_os.h"
 
 SemaphoreHandle_t semTickPulse;
 
@@ -28,14 +29,21 @@ void main()
 {
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
 
-    ConsoleInit();
-    PRINT_OS("\r\n");
+    //ConsoleInit();
+    //PRINT_OS("\r\n");
 
-    HwAdcInit();
-    HwRevPrint();
-    HwVoltPrint();
+    //HwAdcInit();
+    //HwRevPrint();
+    //HwVoltPrint();
 
-    ConsoleCliStart();
+    MdbOsInit();
+    // for(int i = 0; i < 50000; i++)
+    // {
+    //     asm("NOP");
+    // }
+    //MdbPrint();
+
+    //ConsoleCliStart();
 
     xTaskCreate(
         vTaskCode,
