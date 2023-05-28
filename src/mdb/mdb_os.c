@@ -336,7 +336,7 @@ static void MdbOsVendDenied(void)
 
 static void MdbOsUpdateNonRespTime(uint8_t time)
 {
-    xTimerChangePeriod(xNonResponseTimer, time, 0);
+    xTimerChangePeriod(xNonResponseTimer, time + 5, 0);
     xTimerStop(xNonResponseTimer, 0);
 }
 
