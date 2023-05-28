@@ -36,6 +36,8 @@ EventGroupHandle_t  xCreatedEventGroup;
 EventGroupHandle_t  xSetupSeqEg; 
 TimerHandle_t       xNonResponseTimer;
 
+static uint8_t mdb_count_non_resp;
+
 void MdbDelay()
 {
     for(int i = 0; i < 10000; i++)
@@ -139,11 +141,22 @@ void vTaskMdbPoll ( void *pvParameters)
 void vTimerNonRespCb( TimerHandle_t xTimer )
 {
     MdbBufSend(NULL, 0);
+
+    mdb_count_non_resp--;
+    if (mdb_count_non_resp == 0)
+    {
+        mdb_count_non_resp = MDB_COUNT_NON_RESP;
+        /* RESTART */
+        xEventGroupSetBits(xSetupSeqEg, MDB_OS_IS_SETUP_FLAG);
+        xSemaphoreGive(mdb_transfer_sem);
+    }
 }
 
 void MdbOsInit(void)
 {
     mdv_dev_init_struct_t mdb_dev_struct;
+
+    mdb_count_non_resp = MDB_COUNT_NON_RESP;
 
     mdb_dev_struct.send_callback        = MdbBufSend;
     mdb_dev_struct.select_item_cb       = MdbOsSelectItem;
@@ -316,6 +329,7 @@ void USART2_IRQHandler(void)
         ch = (uint16_t)USART_ReceiveData(USART2);
         xQueueSendFromISR(fdBuferMdbRec, &ch, NULL);
 
+        mdb_count_non_resp = MDB_COUNT_NON_RESP;
         xTimerStopFromISR(xNonResponseTimer, &xHigherPriorityTaskWoken);
         if(xHigherPriorityTaskWoken == pdTRUE) taskYIELD();
     }

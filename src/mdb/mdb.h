@@ -11,6 +11,7 @@
 #define MDB_T_RESPONSE_TIMEOUT      5       /* ms */
 #define MDB_NON_RESP_TIMEOUT        5       /* s, by default */
 #define MDB_T_RESET_TIMEOUT         10      /* s */
+#define MDB_COUNT_NON_RESP          10
 
 /* MDB_SETUP_CMD */
 #define MDB_SETUP_CONF_DATA_SUBCMD  0x00
