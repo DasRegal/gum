@@ -415,6 +415,7 @@ mdb_ret_resp_t MdbReceiveChar(uint16_t ch)
     {
         ret = MdbParseData(mdb_dev.rx_len);
         mdb_dev.rx_len = 0;
+        mdb_dev.rx_data[0] = 0;
     }
 
     return ret;
@@ -424,7 +425,6 @@ static mdb_ret_resp_t MdbParseData(uint8_t len)
 {
     mdb_ret_resp_t ret = MDB_RET_IDLE;
 
-    mdb_dev.rx_len = len;
     if (mdb_dev.rx_len == 1)
     {
         switch(mdb_dev.rx_data[0] & 0xFF)
@@ -570,6 +570,7 @@ static void MdbParseResponse(void)
                         break;
                     default: break;
                 }
+                break;
             }
         case MDB_POLL_REVAL_APPR_RESP:
             {

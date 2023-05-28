@@ -80,19 +80,13 @@ void vTaskMdbRecBuf ( void *pvParameters)
             {
                 case MDB_RET_IN_PROG:
                     continue;
-                    break;
                 case MDB_RET_DATA:
                     xEventGroupSetBits(xCreatedEventGroup, MDB_OS_ACK_FLAG);
                     xSemaphoreGive(mdb_transfer_sem);
                     continue;
-                    break;
                 case MDB_RET_IDLE:
-                    // xEventGroupSetBits(xCreatedEventGroup, MDB_OS_TX_READY_FLAG);
                     xSemaphoreGive(mdb_transfer_sem);
                     continue;
-                    break;
-                case MDB_RET_REPEAT:
-                    break;
                 default:
                     break;
             }
@@ -102,7 +96,6 @@ void vTaskMdbRecBuf ( void *pvParameters)
 
 void vTaskMdbPoll ( void *pvParameters)
 {
-    // uint8_t state = 0;
     EventBits_t flags;
     for( ;; )
     {
@@ -173,6 +166,13 @@ void vTaskMdbPoll ( void *pvParameters)
 
 void vTimerNonRespCb( TimerHandle_t xTimer )
 {
+    /* Do not repeat ACK by timeout*/
+    if (DMA_GetCurrDataCounter(DMA1_Channel7) == 1)
+    {
+        xTimerStop(xNonResponseTimer, 0);
+        return;
+    }
+
     MdbBufSend(NULL, 0);
 
     mdb_count_non_resp--;
