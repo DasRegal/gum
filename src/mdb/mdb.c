@@ -61,10 +61,9 @@
 #define MDB_CURRENCY_CODE_RUB_1     0x643
 #define MDB_CURRENCY_CODE_RUB_2     0x810
 
-extern void UsartDebugSendString(const char *pucBuffer);
+// extern void UsartDebugSendString(const char *pucBuffer);
 
 static void MdbSendCmd(uint8_t cmd, uint8_t subcmd, uint8_t * data, uint8_t len);
-// static void MdbSendResponce(uint8_t resp);
 static uint16_t MdbCalcChk(uint16_t * buf, uint8_t len);
 static bool MdbIsValidateChk(uint16_t * buf, uint8_t len);
 static void MdbSendData(uint16_t * buf, uint8_t len);
@@ -77,7 +76,6 @@ static void MdbVendDenied(void);
 static void MdbRevalueApproved(void);
 static void MdbRevalueDenied(void);
 static void MdbUpdateNonRespTime(uint8_t time);
-//static void MdbReceiveData(uint16_t * buf, uint8_t len);
 
 typedef enum
 {
@@ -344,12 +342,6 @@ static void MdbSendCmd(uint8_t cmd, uint8_t subcmd, uint8_t * data, uint8_t len)
 
 }
 
-// static void MdbSendResponce(uint8_t resp)
-// {
-//     mdb_dev.tx_data[0] = resp;
-//     MdbSendData(mdb_dev.tx_data, 1);
-// }
-
 static uint16_t MdbCalcChk(uint16_t * buf, uint8_t len)
 {
     uint16_t check_sum = 0;
@@ -389,20 +381,6 @@ uint16_t MdbGetRxCh(uint8_t idx)
 
     return mdb_dev.rx_data[idx];
 }
-
-// void MdbClearRx(uint8_t idx)
-// {
-//     mdb_dev.rx_data[idx] &= ~0x100;
-// }
-
-// static void MdbReceiveData(uint16_t * buf, uint8_t len)
-// {
-//     if (len > MDB_MAX_BUF_LEN)
-//         return;
-
-//     mdb_dev.rx_len = len;
-//     memcpy(mdb_dev.rx_data, buf, len);
-// }
 
 mdb_ret_resp_t MdbReceiveChar(uint16_t ch)
 {
@@ -680,20 +658,6 @@ void MdbUsartInit(void)
 
     // Настройка DMA
 
-    // DMA_DeInit(DMA1_Channel6);
-    // DMA_InitStructure.DMA_PeripheralBaseAddr    = (uint32_t)&USART2->DR;
-    // DMA_InitStructure.DMA_MemoryBaseAddr        = (uint32_t) mdb_dev.rx_data;
-    // DMA_InitStructure.DMA_DIR                   = DMA_DIR_PeripheralSRC;
-    // DMA_InitStructure.DMA_BufferSize            = MDB_MAX_BUF_LEN;
-    // DMA_InitStructure.DMA_PeripheralInc         = DMA_PeripheralInc_Disable;
-    // DMA_InitStructure.DMA_MemoryInc             = DMA_MemoryInc_Enable;
-    // DMA_InitStructure.DMA_PeripheralDataSize    = DMA_PeripheralDataSize_HalfWord;
-    // DMA_InitStructure.DMA_MemoryDataSize        = DMA_MemoryDataSize_HalfWord;
-    // DMA_InitStructure.DMA_Mode                  = DMA_Mode_Circular;
-    // DMA_InitStructure.DMA_Priority              = DMA_Priority_High;
-    // DMA_InitStructure.DMA_M2M                   = DMA_M2M_Disable;
-    // DMA_Init(DMA1_Channel6, &DMA_InitStructure);
-
     DMA_DeInit(DMA1_Channel7);
     DMA_InitStructure.DMA_PeripheralBaseAddr    = (uint32_t)&USART2->DR;
     DMA_InitStructure.DMA_MemoryBaseAddr        = (uint32_t) mdb_dev.tx_data;
@@ -708,10 +672,8 @@ void MdbUsartInit(void)
     DMA_InitStructure.DMA_M2M                   = DMA_M2M_Disable;
     DMA_Init(DMA1_Channel7, &DMA_InitStructure);
 
-    // DMA_Cmd(DMA1_Channel6, ENABLE);
     DMA_Cmd(DMA1_Channel7, DISABLE);
 
-    // USART_DMACmd(USART2, USART_DMAReq_Rx, ENABLE);
     USART_DMACmd(USART2, USART_DMAReq_Tx, DISABLE);
 
     USART_InitStructure.USART_BaudRate = 9600;

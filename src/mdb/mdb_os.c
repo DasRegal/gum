@@ -54,7 +54,6 @@ void MdbDelay()
 #define MDB_OS_SELECT_ITEM      (1 << 1)
 #define MDB_OS_VEND_APPROVED    (1 << 2)
 #define MDB_OS_SESS_CANCEL      (1 << 3)
-//#define MDB_OS_TX_READY_FLAG    0b0010
 
 #define MDB_OS_IS_SETUP_FLAG    (1)
 #define MDB_OS_SETUP_1_FLAG     (1 << 1)
@@ -109,7 +108,6 @@ void vTaskMdbPoll ( void *pvParameters)
             MdbAckCmd();
             vTaskDelay(5);
             xSemaphoreGive(mdb_transfer_sem);
-            //xEventGroupSetBits(xCreatedEventGroup, MDB_OS_TX_READY_FLAG);
             continue;
         }
 
@@ -138,10 +136,7 @@ void vTaskMdbPoll ( void *pvParameters)
             MdbVendCmd(MDB_VEND_SESS_COMPL_SUBCMD, NULL);
             continue;
         }
-        // if (flags & MDB_OS_TX_READY_FLAG)
-        // {
-        //     xEventGroupClearBits(xCreatedEventGroup, MDB_OS_TX_READY_FLAG);
-        // }
+
         if (xSemaphoreTake(mdb_poll_sem, 0) == pdTRUE)
         {
             MdbPollCmd();
@@ -244,16 +239,12 @@ static void MdbOsSetupSeq(EventBits_t flags)
 
     if (flags & MDB_OS_SETUP_1_FLAG)
     {
-        // xEventGroupClearBits(xSetupSeqEg, MDB_OS_SETUP_1_FLAG);
-        // xEventGroupSetBits(xSetupSeqEg, MDB_OS_SETUP_2_FLAG);
         MdbResetCmd();
         return;
     }
 
     if (flags & MDB_OS_SETUP_2_FLAG)
     {
-        // xEventGroupClearBits(xSetupSeqEg, MDB_OS_SETUP_2_FLAG);
-        // xEventGroupSetBits(xSetupSeqEg, MDB_OS_SETUP_3_FLAG);
         buf[0] = MdbGetLevel();
         buf[1] = 0;
         buf[2] = 0;
@@ -264,8 +255,6 @@ static void MdbOsSetupSeq(EventBits_t flags)
 
     if (flags & MDB_OS_SETUP_3_FLAG)
     {
-        // xEventGroupClearBits(xSetupSeqEg, MDB_OS_SETUP_3_FLAG);
-        // xEventGroupSetBits(xSetupSeqEg, MDB_OS_SETUP_4_FLAG);
         buf[0] = 0;
         buf[1] = 100;   /* Max price */
         buf[2] = 0;
@@ -276,8 +265,6 @@ static void MdbOsSetupSeq(EventBits_t flags)
 
     if (flags & MDB_OS_SETUP_4_FLAG)
     {
-        // xEventGroupClearBits(xSetupSeqEg, MDB_OS_SETUP_4_FLAG);
-        // xEventGroupSetBits(xSetupSeqEg, MDB_OS_SETUP_5_FLAG);
         memcpy(buf,               MDB_VMC_MANUFACTURE_CODE, 3);
         memcpy(buf + 3,           serial_number,            12);
         memcpy(buf + 3 + 12,      model_number,             12);
@@ -304,7 +291,6 @@ static void MdbBufSend(const uint16_t *pucBuffer, uint8_t len)
     }
 
     DMA_ITConfig(DMA1_Channel7, DMA_IT_TC, ENABLE);
-    // vTaskDelay(5);
     USART_DMACmd(USART2, USART_DMAReq_Tx, ENABLE);
 }
 
@@ -321,12 +307,6 @@ static void MdbOsSessionCancel(void)
 static void MdbOsVendApproved(void)
 {
     xEventGroupSetBits(xCreatedEventGroup, MDB_OS_VEND_APPROVED);
-    // uint8_t buf[2];
-    // uint16_t item = 23;
-
-    // buf[0] = (item >> 8) & 0xFF;
-    // buf[1] = item & 0xFF;
-    // MdbVendCmd(MDB_VEND_SUCCESS_SUBCMD, buf);
 }
 
 static void MdbOsVendDenied(void)
