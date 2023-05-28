@@ -60,6 +60,7 @@ static void MdbSelectItem(void);
 static void MdbSessionCancel(void);
 static void MdbVendApproved(void);
 static void MdbVendDenied(void);
+static void MdbUpdateNonRespTime(uint8_t time);
 //static void MdbReceiveData(uint16_t * buf, uint8_t len);
 
 typedef enum
@@ -104,6 +105,7 @@ typedef struct
     void            (*session_cancel_cb)(void);
     void            (*vend_approved_cb)(void);
     void            (*vend_denied_cb)(void);
+    void            (*update_resp_time_cb)(uint8_t);
     mdb_dev_slave_t dev_slave;
     mdb_state_t     state;
 } mdb_dev_t;
@@ -119,10 +121,12 @@ void MdbInit(mdv_dev_init_struct_t dev_struct)
     mdb_dev.session_cancel_cb = dev_struct.session_cancel_cb;
     mdb_dev.vend_approved_cb= dev_struct.vend_approved_cb;
     mdb_dev.vend_denied_cb  = dev_struct.vend_denied_cb;
+    mdb_dev.update_resp_time_cb = dev_struct.update_resp_time_cb;
     mdb_dev.rx_len          = 0;
     mdb_dev.level           = MDB_LEVEL_2;
     mdb_dev.state           = MDB_STATE_INACTIVE;
     mdb_dev.addr            = MDB_CASHLESS_DEV_1_ADDR;
+    mdb_dev.dev_slave.max_resp_time = 0xFF;
 }
 
 void MdbSetSlaveAddr(uint8_t addr)
@@ -459,6 +463,8 @@ static void MdbParseResponse(void)
                     MdbSetSlaveAddr(mdb_dev.dev_slave.level);
                 }
 
+                MdbUpdateNonRespTime(mdb_dev.dev_slave.max_resp_time);
+
                 mdb_dev.state = MDB_STATE_ENABLED;
                 break;
             }
@@ -547,6 +553,14 @@ mdb_level_t MdbGetLevel(void)
     return mdb_dev.level;
 }
 
+static void MdbUpdateNonRespTime(uint8_t time)
+{
+    if (mdb_dev.update_resp_time_cb == NULL)
+        return;
+
+    mdb_dev.update_resp_time_cb(time);
+}
+
 void MdbUsartInit(void)
 {
     USART_InitTypeDef USART_InitStructure;
@@ -594,7 +608,7 @@ void MdbUsartInit(void)
     DMA_InitStructure.DMA_MemoryInc             = DMA_MemoryInc_Enable;
     DMA_InitStructure.DMA_PeripheralDataSize    = DMA_PeripheralDataSize_HalfWord;
     DMA_InitStructure.DMA_MemoryDataSize        = DMA_MemoryDataSize_HalfWord;
-    DMA_InitStructure.DMA_Mode                  = DMA_Mode_Normal;
+    DMA_InitStructure.DMA_Mode                  = DMA_Mode_Circular;
     DMA_InitStructure.DMA_Priority              = DMA_Priority_High;
     DMA_InitStructure.DMA_M2M                   = DMA_M2M_Disable;
     DMA_Init(DMA1_Channel7, &DMA_InitStructure);

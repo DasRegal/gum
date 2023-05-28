@@ -9,6 +9,7 @@
 
 #define MDB_POLL_TIME               125     /* 25-200 ms. Recmmended 125-200 ms. */
 #define MDB_T_RESPONSE_TIMEOUT      5       /* ms */
+#define MDB_NON_RESP_TIMEOUT        5       /* s, by default */
 #define MDB_T_RESET_TIMEOUT         10      /* s */
 
 /* MDB_SETUP_CMD */
@@ -65,6 +66,7 @@ typedef struct
     void            (*session_cancel_cb)(void);
     void            (*vend_approved_cb)(void);
     void            (*vend_denied_cb)(void);
+    void            (*update_resp_time_cb)(uint8_t);
 } mdv_dev_init_struct_t;
 //void MdbPrint(void);
 //void MdbBufSend(const uint16_t *pucBuffer, uint8_t len);
@@ -80,6 +82,7 @@ void MdbRevalueCmd(uint8_t subcmd, uint8_t * data);
 void MdbExpansionCmd(uint8_t subcmd, uint8_t * data);
 void MdbAckCmd(void);
 mdb_level_t MdbGetLevel(void);
+uint8_t MdbGetNonRespTime(void);
 // void MdbGetCh(uint16_t ch);
 void MdbUsartInit(void);
 uint16_t MdbGetRxCh(uint8_t idx);

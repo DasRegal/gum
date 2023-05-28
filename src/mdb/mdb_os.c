@@ -25,14 +25,16 @@ static void MdbOsSelectItem(void);
 static void MdbOsSessionCancel(void);
 static void MdbOsVendApproved(void);
 static void MdbOsVendDenied(void);
+static void MdbOsUpdateNonRespTime(uint8_t time);
 static void MdbOsSetupSeq(EventBits_t flags;);
 
-QueueHandle_t     fdBuferMdbRec;
-SemaphoreHandle_t mdb_transfer_sem;
-SemaphoreHandle_t mdb_start_rx_sem;
-SemaphoreHandle_t mdb_poll_sem;
-EventGroupHandle_t xCreatedEventGroup;
-EventGroupHandle_t xSetupSeqEg; 
+QueueHandle_t       fdBuferMdbRec;
+SemaphoreHandle_t   mdb_transfer_sem;
+SemaphoreHandle_t   mdb_start_rx_sem;
+SemaphoreHandle_t   mdb_poll_sem;
+EventGroupHandle_t  xCreatedEventGroup;
+EventGroupHandle_t  xSetupSeqEg; 
+TimerHandle_t       xNonResponseTimer;
 
 void MdbDelay()
 {
@@ -134,6 +136,11 @@ void vTaskMdbPoll ( void *pvParameters)
     }
 }
 
+void vTimerNonRespCb( TimerHandle_t xTimer )
+{
+    MdbBufSend(NULL, 0);
+}
+
 void MdbOsInit(void)
 {
     mdv_dev_init_struct_t mdb_dev_struct;
@@ -143,11 +150,18 @@ void MdbOsInit(void)
     mdb_dev_struct.session_cancel_cb    = MdbOsSessionCancel;
     mdb_dev_struct.vend_approved_cb     = MdbOsVendApproved;
     mdb_dev_struct.vend_denied_cb       = MdbOsVendDenied;
+    mdb_dev_struct.update_resp_time_cb  = MdbOsUpdateNonRespTime;
     MdbInit(mdb_dev_struct);
 
     vSemaphoreCreateBinary(mdb_transfer_sem);
     vSemaphoreCreateBinary(mdb_start_rx_sem);
     vSemaphoreCreateBinary(mdb_poll_sem);
+
+    xNonResponseTimer = xTimerCreate ( "NonRespTimer", 
+                           MDB_NON_RESP_TIMEOUT * 1000,
+                           pdFALSE,
+                           ( void * ) 0,
+                           vTimerNonRespCb );
     
     xSemaphoreTake(mdb_poll_sem, 0);
 
@@ -234,10 +248,14 @@ static void MdbOsSetupSeq(EventBits_t flags)
 
 static void MdbBufSend(const uint16_t *pucBuffer, uint8_t len)
 {
-    DMA_Cmd(DMA1_Channel7, DISABLE);
-    DMA_SetCurrDataCounter(DMA1_Channel7, len);
+    if (len)
+    {
+        DMA_Cmd(DMA1_Channel7, DISABLE);
+        DMA_SetCurrDataCounter(DMA1_Channel7, len);
+        DMA_Cmd(DMA1_Channel7, ENABLE);
+    }
+
     DMA_ITConfig(DMA1_Channel7, DMA_IT_TC, ENABLE);
-    DMA_Cmd(DMA1_Channel7, ENABLE);
     // vTaskDelay(5);
     USART_DMACmd(USART2, USART_DMAReq_Tx, ENABLE);
 }
@@ -262,22 +280,34 @@ static void MdbOsVendDenied(void)
     
 }
 
+static void MdbOsUpdateNonRespTime(uint8_t time)
+{
+    xTimerChangePeriod(xNonResponseTimer, time, 0);
+    xTimerStop(xNonResponseTimer, 0);
+}
+
 void DMA1_Channel7_IRQHandler(void)
 {
+    static  portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
+    
     if (DMA_GetITStatus(DMA1_IT_TC7) != RESET)
     {
         DMA_ClearITPendingBit(DMA1_IT_TC7);
         USART_DMACmd(USART2, USART_DMAReq_Tx, DISABLE);
         DMA_ITConfig(DMA1_Channel7, DMA_IT_TC, DISABLE);
 
-        static  portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
         xSemaphoreGiveFromISR(mdb_start_rx_sem, &xHigherPriorityTaskWoken);
+        if(xHigherPriorityTaskWoken == pdTRUE) taskYIELD();
+
+        xTimerStartFromISR(xNonResponseTimer, &xHigherPriorityTaskWoken);
         if(xHigherPriorityTaskWoken == pdTRUE) taskYIELD();
     }
 }
 
 void USART2_IRQHandler(void)
 {
+    static  portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
+
     if(USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)
     {
         uint16_t ch;
@@ -285,5 +315,8 @@ void USART2_IRQHandler(void)
         USART_ClearITPendingBit(USART2, USART_IT_RXNE);
         ch = (uint16_t)USART_ReceiveData(USART2);
         xQueueSendFromISR(fdBuferMdbRec, &ch, NULL);
+
+        xTimerStopFromISR(xNonResponseTimer, &xHigherPriorityTaskWoken);
+        if(xHigherPriorityTaskWoken == pdTRUE) taskYIELD();
     }
 }
