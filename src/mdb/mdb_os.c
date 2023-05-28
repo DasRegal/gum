@@ -30,6 +30,8 @@ static void MdbOsRevalueApproved(void);
 static void MdbOsRevalueDenied(void);
 static void MdbOsSetupSeq(EventBits_t flags;);
 
+void VmcChooseItem(uint16_t price, uint16_t item);
+
 QueueHandle_t       fdBuferMdbRec;
 SemaphoreHandle_t   mdb_transfer_sem;
 SemaphoreHandle_t   mdb_start_rx_sem;
@@ -48,8 +50,11 @@ void MdbDelay()
     }
 }
 
-#define MDB_OS_ACK_FLAG         0b0001
-#define MDB_OS_TX_READY_FLAG    0b0010
+#define MDB_OS_ACK_FLAG         (1)
+#define MDB_OS_SELECT_ITEM      (1 << 1)
+#define MDB_OS_VEND_APPROVED    (1 << 2)
+#define MDB_OS_SESS_CANCEL      (1 << 3)
+//#define MDB_OS_TX_READY_FLAG    0b0010
 
 #define MDB_OS_IS_SETUP_FLAG    (1)
 #define MDB_OS_SETUP_1_FLAG     (1 << 1)
@@ -115,6 +120,31 @@ void vTaskMdbPoll ( void *pvParameters)
             continue;
         }
 
+        if (flags & MDB_OS_SELECT_ITEM)
+        {
+            xEventGroupClearBits(xCreatedEventGroup, MDB_OS_SELECT_ITEM);
+            VmcChooseItem(1, 23);
+            continue;
+        }
+
+        if (flags & MDB_OS_VEND_APPROVED)
+        {
+            xEventGroupClearBits(xCreatedEventGroup, MDB_OS_VEND_APPROVED);
+            uint8_t buf[2];
+            uint16_t item = 23;
+
+            buf[0] = (item >> 8) & 0xFF;
+            buf[1] = item & 0xFF;
+            MdbVendCmd(MDB_VEND_SUCCESS_SUBCMD, buf);
+            continue;
+        }
+
+        if (flags & MDB_OS_SESS_CANCEL)
+        {
+            xEventGroupClearBits(xCreatedEventGroup, MDB_OS_SESS_CANCEL);
+            MdbVendCmd(MDB_VEND_SESS_COMPL_SUBCMD, NULL);
+            continue;
+        }
         // if (flags & MDB_OS_TX_READY_FLAG)
         // {
         //     xEventGroupClearBits(xCreatedEventGroup, MDB_OS_TX_READY_FLAG);
@@ -280,22 +310,28 @@ static void MdbBufSend(const uint16_t *pucBuffer, uint8_t len)
 
 static void MdbOsSelectItem(void)
 {
-
+    xEventGroupSetBits(xCreatedEventGroup, MDB_OS_SELECT_ITEM);
 }
 
 static void MdbOsSessionCancel(void)
 {
-
+    xEventGroupSetBits(xCreatedEventGroup, MDB_OS_SESS_CANCEL);
 }
 
 static void MdbOsVendApproved(void)
 {
-    
+    xEventGroupSetBits(xCreatedEventGroup, MDB_OS_VEND_APPROVED);
+    // uint8_t buf[2];
+    // uint16_t item = 23;
+
+    // buf[0] = (item >> 8) & 0xFF;
+    // buf[1] = item & 0xFF;
+    // MdbVendCmd(MDB_VEND_SUCCESS_SUBCMD, buf);
 }
 
 static void MdbOsVendDenied(void)
 {
-    
+    MdbVendCmd(MDB_VEND_SESS_COMPL_SUBCMD, NULL);
 }
 
 static void MdbOsUpdateNonRespTime(uint8_t time)
@@ -348,4 +384,15 @@ void USART2_IRQHandler(void)
         xTimerStopFromISR(xNonResponseTimer, &xHigherPriorityTaskWoken);
         if(xHigherPriorityTaskWoken == pdTRUE) taskYIELD();
     }
+}
+
+void VmcChooseItem(uint16_t price, uint16_t item)
+{
+    uint8_t buf[4];
+
+    buf[0] = (price >> 8) & 0xFF;
+    buf[1] = price & 0xFF;
+    buf[2] = (item >> 8) & 0xFF;
+    buf[3] = item & 0xFF;
+    MdbVendCmd(MDB_VEND_REQ_SUBCMD, buf);
 }

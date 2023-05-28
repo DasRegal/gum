@@ -189,7 +189,7 @@ void MdbVendCmd(uint8_t subcmd, uint8_t * data)
                 if (mdb_dev.is_expansion_en &&
                     mdb_dev.level == MDB_LEVEL_3)
                 {
-                    len = 6;
+                    len = 7;
                 }
                 break;
             }
@@ -197,12 +197,12 @@ void MdbVendCmd(uint8_t subcmd, uint8_t * data)
         case MDB_VEND_FAILURE_SUBCMD:
         case MDB_VEND_CANCEL_SUBCMD:
             {
-                len = 0;
+                len = 1;
                 break;
             }
         case MDB_VEND_SUCCESS_SUBCMD:
             {
-                len = 2;
+                len = 3;
                 break;
             }
         case MDB_VEND_CASH_SALE_SUBCMD:
@@ -210,7 +210,7 @@ void MdbVendCmd(uint8_t subcmd, uint8_t * data)
                 if (mdb_dev.is_expansion_en &&
                     mdb_dev.level == MDB_LEVEL_3)
                 {
-                    len = 8;
+                    len = 9;
                 }
                 break;
             }
@@ -219,7 +219,7 @@ void MdbVendCmd(uint8_t subcmd, uint8_t * data)
                 if (mdb_dev.is_expansion_en &&
                     mdb_dev.level == MDB_LEVEL_3)
                 {
-                    len = 8;
+                    len = 7;
                 }
                 break;
             }
