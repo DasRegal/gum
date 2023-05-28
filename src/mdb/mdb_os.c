@@ -26,6 +26,8 @@ static void MdbOsSessionCancel(void);
 static void MdbOsVendApproved(void);
 static void MdbOsVendDenied(void);
 static void MdbOsUpdateNonRespTime(uint8_t time);
+static void MdbOsRevalueApproved(void);
+static void MdbOsRevalueDenied(void);
 static void MdbOsSetupSeq(EventBits_t flags;);
 
 QueueHandle_t       fdBuferMdbRec;
@@ -55,6 +57,7 @@ void MdbDelay()
 #define MDB_OS_SETUP_3_FLAG     (1 << 3)
 #define MDB_OS_SETUP_4_FLAG     (1 << 4)
 #define MDB_OS_SETUP_5_FLAG     (1 << 5)
+#define MDB_OS_SETUP_6_FLAG     (1 << 6)
 
 void vTaskMdbRecBuf ( void *pvParameters)
 {
@@ -164,6 +167,8 @@ void MdbOsInit(void)
     mdb_dev_struct.vend_approved_cb     = MdbOsVendApproved;
     mdb_dev_struct.vend_denied_cb       = MdbOsVendDenied;
     mdb_dev_struct.update_resp_time_cb  = MdbOsUpdateNonRespTime;
+    mdb_dev_struct.reval_apprv_cb       = MdbOsRevalueApproved;
+    mdb_dev_struct.reval_denied_cb      = MdbOsRevalueDenied;
     MdbInit(mdb_dev_struct);
 
     vSemaphoreCreateBinary(mdb_transfer_sem);
@@ -297,6 +302,16 @@ static void MdbOsUpdateNonRespTime(uint8_t time)
 {
     xTimerChangePeriod(xNonResponseTimer, time, 0);
     xTimerStop(xNonResponseTimer, 0);
+}
+
+static void MdbOsRevalueApproved(void)
+{
+
+}
+
+static void MdbOsRevalueDenied(void)
+{
+
 }
 
 void DMA1_Channel7_IRQHandler(void)

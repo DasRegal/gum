@@ -68,6 +68,8 @@ typedef struct
     void            (*vend_approved_cb)(void);
     void            (*vend_denied_cb)(void);
     void            (*update_resp_time_cb)(uint8_t);
+    void            (*reval_apprv_cb)(void);
+    void            (*reval_denied_cb)(void);
 } mdv_dev_init_struct_t;
 //void MdbPrint(void);
 //void MdbBufSend(const uint16_t *pucBuffer, uint8_t len);

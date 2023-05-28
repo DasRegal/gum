@@ -44,6 +44,20 @@
 #define MDB_POLL_DAT_ENTRY_REQ_RESP  0x12
 #define MDB_POLL_DAT_ENT_CANCEL_RESP 0x13
 
+#define MDB_PAY_MEDIA_ERR           0x00
+#define MDB_INVLD_PAY_MEDIA_ERR     0x01
+#define MDB_TAMPER_ERR              0x02
+#define MDB_MANUF_DEF_1_ERR         0x03
+#define MDB_COMMUNICATIONS_2_ERR    0x04
+#define MDB_READER_REQ_SERVICE_ERR  0x05
+#define MDB_UNASSIGNED_ERR          0x06
+#define MDB_MANUF_DEF_2_ERR         0x07
+#define MDB_READER_FAILURE_ERR      0x08
+#define MDB_COMMUNICATIONS_3_ERR    0x09
+#define MDB_PAY_MEDIA_JAMMED_ERR    0x0A
+#define MDB_MANUF_DEF_ERR           0x0B
+#define MDB_REFUND_ERR              0x0C
+
 #define MDB_CURRENCY_CODE_RUB_1     0x643
 #define MDB_CURRENCY_CODE_RUB_2     0x810
 
@@ -60,12 +74,14 @@ static void MdbSelectItem(void);
 static void MdbSessionCancel(void);
 static void MdbVendApproved(void);
 static void MdbVendDenied(void);
+static void MdbRevalueApproved(void);
+static void MdbRevalueDenied(void);
 static void MdbUpdateNonRespTime(uint8_t time);
 //static void MdbReceiveData(uint16_t * buf, uint8_t len);
 
 typedef enum
 {
-    MDB_STATE_INACTIVE,
+    MDB_STATE_INACTIVE = 1,
     MDB_STATE_DISABLED,     /* CMD_READER_ENABLE->STATE_ENABLE, CMD_RESET->STATE_INACTIVE*/
     MDB_STATE_ENABLED,      /* CMD_READER_DISABLE->STATE_DISABLE, CMD_RESET->STATE_INACTIVE */
     MDB_STATE_SESSION_IDLE, /* payment event->STATE_SESS_IDLE. CMD_SESSION_COMPLETE->?, CMD_VEND_REQUEST->STATE_VEND, CMD_REVALUE_REQUEST->STATE_REVALUE, CMD_NEG_VEND_REQUEST->STATE_NEG_VEND */
@@ -106,6 +122,8 @@ typedef struct
     void            (*vend_approved_cb)(void);
     void            (*vend_denied_cb)(void);
     void            (*update_resp_time_cb)(uint8_t);
+    void            (*reval_apprv_cb)(void);
+    void            (*reval_denied_cb)(void);
     mdb_dev_slave_t dev_slave;
     mdb_state_t     state;
 } mdb_dev_t;
@@ -122,6 +140,8 @@ void MdbInit(mdv_dev_init_struct_t dev_struct)
     mdb_dev.vend_approved_cb= dev_struct.vend_approved_cb;
     mdb_dev.vend_denied_cb  = dev_struct.vend_denied_cb;
     mdb_dev.update_resp_time_cb = dev_struct.update_resp_time_cb;
+    mdb_dev.reval_apprv_cb  = dev_struct.reval_apprv_cb;
+    mdb_dev.reval_denied_cb = dev_struct.reval_denied_cb;
     mdb_dev.rx_len          = 0;
     mdb_dev.level           = MDB_LEVEL_2;
     mdb_dev.state           = MDB_STATE_INACTIVE;
@@ -513,6 +533,64 @@ static void MdbParseResponse(void)
                 mdb_dev.dev_slave.sw_version = (mdb_dev.rx_data[28] << 8) + mdb_dev.rx_data[29];
                 break;
             }
+        case MDB_POLL_ERROR_RESP:
+            {
+                switch(mdb_dev.rx_data[1])
+                {
+                    case MDB_PAY_MEDIA_ERR:
+                    case MDB_INVLD_PAY_MEDIA_ERR:
+                    case MDB_TAMPER_ERR:
+                    case MDB_MANUF_DEF_1_ERR:
+                    case MDB_COMMUNICATIONS_2_ERR:
+                    case MDB_READER_REQ_SERVICE_ERR:
+                    case MDB_UNASSIGNED_ERR:
+                    case MDB_MANUF_DEF_2_ERR:
+                    case MDB_READER_FAILURE_ERR:
+                    case MDB_COMMUNICATIONS_3_ERR:
+                    case MDB_PAY_MEDIA_JAMMED_ERR:
+                    case MDB_MANUF_DEF_ERR:
+                    case MDB_REFUND_ERR:
+                        break;
+                    default: break;
+                }
+                break;
+            }
+        case MDB_POLL_OUT_OF_SEQ_RESP:
+            {
+                switch(mdb_dev.rx_data[1])
+                {
+                    case MDB_STATE_INACTIVE:
+                    case MDB_STATE_DISABLED:
+                    case MDB_STATE_ENABLED:
+                    case MDB_STATE_SESSION_IDLE:
+                    case MDB_STATE_VEND:
+                    case MDB_STATE_REVALUE:
+                    case MDB_STATE_NEG_VEND:
+                        /* RESET! */
+                        break;
+                    default: break;
+                }
+            }
+        case MDB_POLL_REVAL_APPR_RESP:
+            {
+                MdbRevalueApproved();
+                break;
+            }
+        case MDB_POLL_REVAL_DENIED_RESP:
+            {
+                MdbRevalueDenied();
+                break;
+            }
+        case MDB_POLL_REVAL_LIMIT_RESP:
+            {
+                break;
+            }
+        case MDB_POLL_TIME_DATA_RESP:
+            {
+                break;
+            }
+
+        default: break;
     }
 }
 
@@ -546,6 +624,22 @@ static void MdbVendDenied(void)
         return;
 
     mdb_dev.vend_denied_cb();
+}
+
+static void MdbRevalueApproved(void)
+{
+    if (mdb_dev.reval_apprv_cb == NULL)
+        return;
+
+    mdb_dev.reval_apprv_cb();
+}
+
+static void MdbRevalueDenied(void)
+{
+    if (mdb_dev.reval_denied_cb == NULL)
+        return;
+
+    mdb_dev.reval_denied_cb();
 }
 
 mdb_level_t MdbGetLevel(void)
