@@ -379,7 +379,7 @@ void MdbSetupCmd(uint8_t subcmd, uint8_t * data)
 
     lvl_support = mdb_cmd[MDB_SETUP_CMD_E].sub_cmd[subcmd].is_level_bit;
 
-    if(!(lvl_support & (1 << mdb_dev.level - 1)))
+    if(!(lvl_support & (1 << (mdb_dev.level - 1))))
         return; /* Command not support */
 
     if (mdb_dev.is_expansion_en)
@@ -408,27 +408,19 @@ void MdbSendCommand(uint8_t cmd, uint8_t subcmd, uint8_t * data)
     uint8_t lvl_type = 0;
     uint8_t lvl_support = 0;
 
-    // if (mdb_cmd[cmd] == NULL)
-    // {
-    //     /* Command Not found */
-    //     /* FATAL ERROR */
-    //     DEBUG_PRINT("%s: FATAL EEROR\n", __func__);
-    //     return;
-    // }
-
     mdb_dev.tx_data[0] = cmd + mdb_dev.addr + MDB_MODE_BIT;
 
     if (mdb_cmd[cmd].sub_cmd == NULL)
     {
         mdb_dev.tx_data[1] = MdbCalcChk(mdb_dev.tx_data, 1);
         MdbSendData(mdb_dev.tx_data, 2);
-        // DEBUG_PRINT("%s: 0x%x 0x%x\n", __func__, mdb_dev.tx_data[0], mdb_dev.tx_data[1]);
+        // DEBUG_PRINT(("\n%s: 0x%x 0x%x\n", __func__, mdb_dev.tx_data[0], mdb_dev.tx_data[1]));
         return;
     }
 
     lvl_support = mdb_cmd[cmd].sub_cmd[subcmd].is_level_bit;
 
-    if(!(lvl_support & (1 << mdb_dev.level - 1)))
+    if(!(lvl_support & (1 << (mdb_dev.level - 1))))
     {
         DEBUG_PRINT(("Command not supported for level %d!", mdb_dev.level));
         return; /* Command not support */
@@ -440,11 +432,6 @@ void MdbSendCommand(uint8_t cmd, uint8_t subcmd, uint8_t * data)
         lvl_type = mdb_dev.level - 1;
 
     size = mdb_cmd[cmd].sub_cmd[subcmd].data_size[lvl_type];
-
-    // MdbSendCmd(MDB_SETUP_CMD, subcmd, data, size);
-
-    // mdb_dev.send_cmd    = cmd;
-    // mdb_dev.send_subcmd = subcmd;
 
     mdb_dev.tx_data[0] = cmd + mdb_dev.addr + MDB_MODE_BIT;
 
@@ -1014,6 +1001,7 @@ static mdb_ret_resp_t MdbParseResponse(void)
 
         default: break;
     }
+    return MDB_RET_OK_DATA;
 }
 
 static void MdbSelectItem(void)

@@ -77,9 +77,9 @@ void vTaskMdbRecBuf ( void *pvParameters)
             resp = MdbReceiveChar(ch);
             switch(resp)
             {
-                case MDB_RET_IN_PROG:
+                case MDB_RET_IN_PROGRESS:
                     continue;
-                case MDB_RET_DATA:
+                case MDB_RET_OK_DATA:
                     xEventGroupSetBits(xCreatedEventGroup, MDB_OS_ACK_FLAG);
                     xSemaphoreGive(mdb_transfer_sem);
                     continue;
