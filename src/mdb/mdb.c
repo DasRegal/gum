@@ -2,10 +2,18 @@
 #include <string.h>
 #include <stdio.h>
 
+#ifndef TEST_MDB
 #include "stm32f10x.h"
 #include "FreeRTOS.h"
+#endif
 
 #include "mdb.h"
+
+#ifdef TEST_MDB
+# define DEBUG_PRINT(x) printf x
+#else
+# define DEBUG_PRINT(x) do {} while (0)
+#endif
 
 #define MDB_CASHLESS_DEV_1_ADDR     0x10
 #define MDB_CASHLESS_DEV_2_ADDR     0x60
@@ -17,6 +25,14 @@
 
 #define MDB_MODE_BIT                0x100
 
+/* VMC LEVELS SUPPORT */
+#define MDB_LVL_SUP_1               1
+#define MDB_LVL_SUP_2               2
+#define MDB_LVL_SUP_3               4
+#define MDB_LVL_SUP_EXT_CUR         8
+#define MDB_LVL_SUP_ALL             (MDB_LVL_SUP_1 | MDB_LVL_SUP_2 | MDB_LVL_SUP_3)
+#define MDB_LVL_SUP_ALL_AND_EXT_CUR (MDB_LVL_SUP_ALL | MDB_LVL_SUP_EXT_CUR)
+
 #define MDB_RESET_CMD               0
 #define MDB_SETUP_CMD               1
 #define MDB_POLL_CMD                2
@@ -24,6 +40,37 @@
 #define MDB_READER_CMD              4
 #define MDB_REVALUE_CMD             5
 #define MDB_EXPANSION_CMD           7
+
+/* MDB_SETUP_CMD */
+#define MDB_SETUP_CONF_DATA_SUBCMD  0x00
+#define MDB_SETUP_PRICE_SUBCMD      0x01
+/* MDB_VEND_CMD */
+#define MDB_VEND_REQ_SUBCMD         0x00
+#define MDB_VEND_CANCEL_SUBCMD      0x01
+#define MDB_VEND_SUCCESS_SUBCMD     0x02
+#define MDB_VEND_FAILURE_SUBCMD     0x03
+#define MDB_VEND_SESS_COMPL_SUBCMD  0x04
+#define MDB_VEND_CASH_SALE_SUBCMD   0x05
+#define MDB_VEND_NEG_REQ_SUBCMD     0x06
+/* MDB_READER_CMD */
+#define MDB_READER_DISABLE_SUBCMD   0x00
+#define MDB_READER_ENABLE_SUBCMD    0x01
+#define MDB_READER_CANCEL_SUBCMD    0x02
+/* MDB_REVALUE_CMD */
+#define MDB_REVALUE_REQ_SUBCMD      0x00
+#define MDB_REVALUE_LIM_REQ_SUBCMD  0x01
+/* MDB_EXPANSION_CMD */
+#define MDB_EXP_REQ_ID_SUBCMD       0x00
+#define MDB_EXP_READ_FILE_SUBCMD    0x01
+#define MDB_EXP_WRITE_FILE_SUBCMD   0x02
+#define MDB_EXP_W_TIME_DATA_SUBCMD  0x03
+#define MDB_EXP_OPT_FTR_EN_SUBCMD   0x04
+#define MDB_EXP_FTL_RX_REQ_SUBCMD   0xFA
+#define MDB_EXP_FTL_RET_DEN_SUBCMD  0xFB
+#define MDB_EXP_FTL_TX_BLK_SUBCMD   0xFC
+#define MDB_EXP_FTL_TX_OK_SUBCMD    0xFD
+#define MDB_EXP_FTL_TX_REQ_SUBCMD   0xFE
+#define MDB_EXP_DIAGNOSTICS_SUBCMD  0xFF
 
 #define MDB_POLL_JUST_RESET_RESP     0x00
 #define MDB_POLL_CONFIG_RESP         0x01
@@ -68,7 +115,7 @@ static uint16_t MdbCalcChk(uint16_t * buf, uint8_t len);
 static bool MdbIsValidateChk(uint16_t * buf, uint8_t len);
 static void MdbSendData(uint16_t * buf, uint8_t len);
 static mdb_ret_resp_t MdbParseData(uint8_t len);
-static void MdbParseResponse(void);
+static mdb_ret_resp_t MdbParseResponse(void);
 static void MdbSelectItem(void);
 static void MdbSessionCancel(void);
 static void MdbVendApproved(void);
@@ -88,7 +135,137 @@ typedef enum
     MDB_STATE_NEG_VEND      /* Level 3 */
 } mdb_state_t;
 
-//mdb_level_t mdb_level_type;
+typedef struct
+{
+    uint8_t cmd_data;
+    uint8_t data_size[4];   /* For each level + External Currency*/
+    uint8_t is_level_bit;
+} mdb_data_t;
+
+typedef struct
+{
+    mdb_code_cmd_t  code_cmd;
+    mdb_data_t      response;
+} mdb_resp_data_t;
+
+typedef struct
+{
+          mdb_code_cmd_t   code_cmd;
+          mdb_data_t      *sub_cmd;
+    const mdb_resp_data_t *response;
+} mdb_cmd_t;
+
+const mdb_resp_data_t poll_response[18] = 
+{
+    { 0 , { MDB_POLL_JUST_RESET_RESP,    { 1,  1,  1,  1 }, MDB_LVL_SUP_ALL_AND_EXT_CUR                         } },
+    { 0 , { MDB_POLL_CONFIG_RESP,        { 8,  8,  8,  8 }, MDB_LVL_SUP_ALL_AND_EXT_CUR                         } },
+    { 0 , { MDB_POLL_DISPLAY_REQ_RESP,   { 34, 34, 34, 34}, MDB_LVL_SUP_ALL_AND_EXT_CUR                         } },
+    { 0 , { MDB_POLL_BEGIN_SESSION_RESP, { 3,  10, 10, 17}, MDB_LVL_SUP_ALL_AND_EXT_CUR                         } },
+    { 0 , { MDB_POLL_SESS_CANCEL_RESP,   { 1,  1,  1,  1 }, MDB_LVL_SUP_ALL_AND_EXT_CUR                         } },
+    { 0 , { MDB_POLL_VEND_APPROVED_RESP, { 3,  3,  3,  5 }, MDB_LVL_SUP_ALL_AND_EXT_CUR                         } },
+    { 0 , { MDB_POLL_VEND_DENIED_RESP,   { 1,  1,  1,  1 }, MDB_LVL_SUP_ALL_AND_EXT_CUR                         } },
+    { 0 , { MDB_POLL_END_SESSION_RESP,   { 1,  1,  1,  1 }, MDB_LVL_SUP_ALL_AND_EXT_CUR                         } },
+    { 0 , { MDB_POLL_CANCELLED_RESP,     { 1,  1,  1,  1 }, MDB_LVL_SUP_ALL_AND_EXT_CUR                         } },
+    { 0 , { MDB_POLL_PERIPH_ID_RESP,     { 30, 30, 34, 34}, MDB_LVL_SUP_ALL_AND_EXT_CUR                         } },
+    { 0 , { MDB_POLL_ERROR_RESP,         { 2,  2,  2,  2 }, MDB_LVL_SUP_ALL_AND_EXT_CUR                         } },
+    { 0 , { MDB_POLL_OUT_OF_SEQ_RESP,    { 1,  2,  2,  2 }, MDB_LVL_SUP_ALL_AND_EXT_CUR                         } },
+    { 0 },
+    { 0 , { MDB_POLL_REVAL_APPR_RESP,    { 0,  1,  1,  1 }, MDB_LVL_SUP_2 | MDB_LVL_SUP_3 | MDB_LVL_SUP_EXT_CUR } },
+    { 0 , { MDB_POLL_REVAL_DENIED_RESP,  { 0,  1,  1,  1 }, MDB_LVL_SUP_2 | MDB_LVL_SUP_3 | MDB_LVL_SUP_EXT_CUR } },
+    { 0 , { MDB_POLL_REVAL_LIMIT_RESP,   { 0,  3,  3,  5 }, MDB_LVL_SUP_2 | MDB_LVL_SUP_3 | MDB_LVL_SUP_EXT_CUR } },
+    { 0 },
+    { 0 , { MDB_POLL_TIME_DATA_RESP,     { 0,  1,  1,  1 }, MDB_LVL_SUP_2 | MDB_LVL_SUP_3 | MDB_LVL_SUP_EXT_CUR } }
+};
+
+mdb_data_t setup_sub_cmd[2] = 
+{
+    { MDB_SETUP_CONF_DATA_SUBCMD, { 5, 5, 5, 5 }, MDB_LVL_SUP_ALL_AND_EXT_CUR },
+    { MDB_SETUP_PRICE_SUBCMD    , { 5, 5, 5, 11}, MDB_LVL_SUP_ALL_AND_EXT_CUR }
+};
+
+const mdb_resp_data_t setup_response[2] = 
+{
+    poll_response[MDB_POLL_CONFIG_RESP],
+    { 0 },
+};
+
+mdb_data_t vend_sub_cmd[7] = 
+{
+    { MDB_VEND_REQ_SUBCMD,         { 5,  5,  5,  7 }, MDB_LVL_SUP_ALL_AND_EXT_CUR         },
+    { MDB_VEND_CANCEL_SUBCMD,      { 1,  1,  1,  1 }, MDB_LVL_SUP_ALL_AND_EXT_CUR         },
+    { MDB_VEND_SUCCESS_SUBCMD,     { 3,  3,  3,  3 }, MDB_LVL_SUP_ALL_AND_EXT_CUR         },
+    { MDB_VEND_FAILURE_SUBCMD,     { 1,  1,  1,  1 }, MDB_LVL_SUP_ALL_AND_EXT_CUR         },
+    { MDB_VEND_SESS_COMPL_SUBCMD,  { 1,  1,  1,  1 }, MDB_LVL_SUP_ALL_AND_EXT_CUR         },
+    { MDB_VEND_CASH_SALE_SUBCMD,   { 5,  5,  5,  9 }, MDB_LVL_SUP_ALL_AND_EXT_CUR         },
+    { MDB_VEND_NEG_REQ_SUBCMD,     { 0,  0,  5,  7 }, MDB_LVL_SUP_3 | MDB_LVL_SUP_EXT_CUR },
+};
+
+mdb_resp_data_t vend_response[9] =
+{
+    poll_response[MDB_POLL_VEND_APPROVED_RESP],
+    poll_response[MDB_POLL_VEND_DENIED_RESP],
+    poll_response[MDB_POLL_VEND_DENIED_RESP],
+    { 0 },
+    { 0 },
+    poll_response[MDB_POLL_END_SESSION_RESP],
+    { 0 },
+    poll_response[MDB_POLL_VEND_APPROVED_RESP],
+    poll_response[MDB_POLL_VEND_DENIED_RESP]
+};
+
+mdb_data_t reader_sub_cmd[3] =
+{
+    { MDB_READER_DISABLE_SUBCMD, { 1,  1,  1,  1 }, MDB_LVL_SUP_ALL_AND_EXT_CUR },
+    { MDB_READER_ENABLE_SUBCMD,  { 1,  1,  1,  1 }, MDB_LVL_SUP_ALL_AND_EXT_CUR },
+    { MDB_READER_CANCEL_SUBCMD,  { 1,  1,  1,  1 }, MDB_LVL_SUP_ALL_AND_EXT_CUR }
+};
+
+mdb_resp_data_t reader_response[3] =
+{
+    { 0 },
+    { 0 },
+    poll_response[MDB_POLL_CANCELLED_RESP]
+};
+
+mdb_data_t revalue_sub_cmd[2] =
+{
+    { MDB_REVALUE_REQ_SUBCMD,     { 0, 3, 3, 5}, MDB_LVL_SUP_2 | MDB_LVL_SUP_3 | MDB_LVL_SUP_EXT_CUR },
+    { MDB_REVALUE_LIM_REQ_SUBCMD, { 0, 1, 1, 1}, MDB_LVL_SUP_2 | MDB_LVL_SUP_3 | MDB_LVL_SUP_EXT_CUR }
+};
+
+mdb_resp_data_t revalue_response[3] =
+{
+    poll_response[MDB_POLL_REVAL_APPR_RESP]  ,
+    poll_response[MDB_POLL_REVAL_DENIED_RESP],
+    poll_response[MDB_POLL_REVAL_LIMIT_RESP]
+};
+
+mdb_data_t expansion_sub_cmd[5] =
+{
+    { MDB_EXP_REQ_ID_SUBCMD,      { 30, 30, 30, 30 }, MDB_LVL_SUP_ALL_AND_EXT_CUR         },
+    { MDB_EXP_READ_FILE_SUBCMD,   { 0 },              0                                   },
+    { MDB_EXP_WRITE_FILE_SUBCMD,  { 0 },              0                                   },
+    { MDB_EXP_W_TIME_DATA_SUBCMD, { 0 },              0                                   },
+    { MDB_EXP_OPT_FTR_EN_SUBCMD,  { 0,  0,  5,  5  }, MDB_LVL_SUP_3 | MDB_LVL_SUP_EXT_CUR }
+};
+
+mdb_resp_data_t expansion_response[2] =
+{
+    poll_response[MDB_POLL_PERIPH_ID_RESP],
+    { 0 }
+};
+
+mdb_cmd_t mdb_cmd[8] = 
+{
+    { MDB_RESET_CMD_E,     NULL,              NULL               },
+    { MDB_SETUP_CMD_E,     setup_sub_cmd,     setup_response     },
+    { MDB_POLL_CMD_E,      NULL,              poll_response      },
+    { MDB_VEND_CMD_E,      vend_sub_cmd,      vend_response      },
+    { MDB_READER_CMD_E,    reader_sub_cmd,    reader_response    },
+    { MDB_REVALUE_CMD_E,   revalue_sub_cmd,   revalue_response   },
+    { 0 },
+    { MDB_EXPANSION_CMD_E, expansion_sub_cmd, expansion_response },
+};
 
 typedef struct
 {
@@ -152,30 +329,235 @@ void MdbSetSlaveAddr(uint8_t addr)
     mdb_dev.addr = addr;
 }
 
+/**
+  * @brief  If this command is received by a cashless device
+  *     it should terminate any ongoing transaction 
+  *     (with an appropriate credit adjustment, if appropriate), 
+  *     eject the payment media (if applicable), and go to the Inactive state.
+  *     |  RESET  |
+  *     |(10h/60h)|
+  * @param  None
+  * @retval None
+  */
 void MdbResetCmd(void)
 {
     uint8_t data[1];
     MdbSendCmd(MDB_RESET_CMD, 0, data, 0);
 }
 
+/**
+  * @brief  Setup reader
+  * @param  subcmd: Sub-command.
+  *   This parameter can be one of the following values:
+  *     @arg MDB_SETUP_CONF_DATA_SUBCMD: Configuration data.
+  *             VMC is sending its configuration data to reader.
+  * 
+  *             |  SETUP  | Config data| VMC Feature | Columns on | Rows on | Display |
+  *             |(11h/61h)|     00h    |    Level    |   display  | display |   Info  |
+  *             |         |     Y1     |      Y2     |     Y3     |    Y4   |    Y5   |
+  * 
+  *     @arg MDB_SETUP_PRICE_SUBCMD: Max / Min prices
+  *             Indicates the VMC is sending the price range to the reader
+  * 
+  *             |  SETUP  | Max/Min prices| Maximum | Minimum |
+  *             |(11h/61h)|       01h     |  price  |  price  |
+  *             |         |       Y1      |  Y2-Y3  |  Y4-Y5  |
+  *
+  *             |  SETUP  | Max/Min prices| Maximum | Minimum | Currency |
+  *             |(11h/61h)|       01h     |  price  |  price  |   Code   |
+  *             |         |       Y1      |  Y2-Y5  |  Y6-Y9  |  Y10-Y11 |
+  *             Level 3 (EXPANDED CURRENCY MODE)
+  * 
+  * @param  data: Array of data
+  * @retval None
+  */
 void MdbSetupCmd(uint8_t subcmd, uint8_t * data)
 {
-    uint8_t len = 5;
-    if (mdb_dev.is_expansion_en &&
-        mdb_dev.level == MDB_LEVEL_3)
-    {
-        len = 11;
-    }
+    uint8_t size = 0;
+    uint8_t lvl_type = 0;
+    uint8_t lvl_support = 0;
 
-    MdbSendCmd(MDB_SETUP_CMD, subcmd, data, len);
+    lvl_support = mdb_cmd[MDB_SETUP_CMD_E].sub_cmd[subcmd].is_level_bit;
+
+    if(!(lvl_support & (1 << mdb_dev.level - 1)))
+        return; /* Command not support */
+
+    if (mdb_dev.is_expansion_en)
+        lvl_type = 3;
+    else
+        lvl_type = mdb_dev.level - 1;
+
+    size = mdb_cmd[MDB_SETUP_CMD_E].sub_cmd[subcmd].data_size[lvl_type];
+
+    MdbSendCmd(MDB_SETUP_CMD, subcmd, data, size);
+
+
+    // uint8_t len = 5;
+    // if (mdb_dev.is_expansion_en &&
+    //     mdb_dev.level == MDB_LEVEL_3)
+    // {
+    //     len = 11;
+    // }
+
+    // MdbSendCmd(MDB_SETUP_CMD, subcmd, data, len);
 }
 
+void MdbSendCommand(uint8_t cmd, uint8_t subcmd, uint8_t * data)
+{
+    uint8_t size = 0;
+    uint8_t lvl_type = 0;
+    uint8_t lvl_support = 0;
+
+    // if (mdb_cmd[cmd] == NULL)
+    // {
+    //     /* Command Not found */
+    //     /* FATAL ERROR */
+    //     DEBUG_PRINT("%s: FATAL EEROR\n", __func__);
+    //     return;
+    // }
+
+    mdb_dev.tx_data[0] = cmd + mdb_dev.addr + MDB_MODE_BIT;
+
+    if (mdb_cmd[cmd].sub_cmd == NULL)
+    {
+        mdb_dev.tx_data[1] = MdbCalcChk(mdb_dev.tx_data, 1);
+        MdbSendData(mdb_dev.tx_data, 2);
+        // DEBUG_PRINT("%s: 0x%x 0x%x\n", __func__, mdb_dev.tx_data[0], mdb_dev.tx_data[1]);
+        return;
+    }
+
+    lvl_support = mdb_cmd[cmd].sub_cmd[subcmd].is_level_bit;
+
+    if(!(lvl_support & (1 << mdb_dev.level - 1)))
+    {
+        DEBUG_PRINT(("Command not supported for level %d!", mdb_dev.level));
+        return; /* Command not support */
+    }
+
+    if (mdb_dev.is_expansion_en)
+        lvl_type = 3;
+    else
+        lvl_type = mdb_dev.level - 1;
+
+    size = mdb_cmd[cmd].sub_cmd[subcmd].data_size[lvl_type];
+
+    // MdbSendCmd(MDB_SETUP_CMD, subcmd, data, size);
+
+    // mdb_dev.send_cmd    = cmd;
+    // mdb_dev.send_subcmd = subcmd;
+
+    mdb_dev.tx_data[0] = cmd + mdb_dev.addr + MDB_MODE_BIT;
+
+    if (size)
+    {
+        mdb_dev.tx_data[1] = subcmd;
+    }
+
+    if (data != NULL)
+    {
+        for(uint8_t i = 1; i < size; i++)
+        {
+            mdb_dev.tx_data[i + 1] = (uint16_t)(data[i - 1] & 0x00FF);
+        }
+    }
+
+    if (size > 1)
+    {
+        mdb_dev.tx_data[size + 1] = MdbCalcChk(mdb_dev.tx_data, size + 1);
+        MdbSendData(mdb_dev.tx_data, size + 2);
+    }
+    else
+    {
+        mdb_dev.tx_data[size + 1] = MdbCalcChk(mdb_dev.tx_data, size + 1);
+        MdbSendData(mdb_dev.tx_data, size + 2);
+    }
+
+}
+
+/**
+  * @brief  The POLL command is used by the VMC to obtain information
+  *     from the payment media reader. 
+  * 
+  *     |  POLL   |
+  *     |(12h/62h)|
+  * 
+  * @param  None
+  * @retval None
+  */
 void MdbPollCmd(void)
 {
     uint8_t data[1];
     MdbSendCmd(MDB_POLL_CMD, 0, data, 0);
 }
 
+/**
+  * @brief  
+  * @param  subcmd: Sub-command.
+  *   This parameter can be one of the following values:
+  *     @arg MDB_VEND_REQ_SUBCMD: The patron has made a selection.
+  *         The VMC is requesting vend approval from the payment
+  *         media reader before dispensing the product
+  *  
+  *             |  VEND   | Vend Request| Item  |  Item  |
+  *             |(13h/63h)|     00h     | Price | Number |
+  *             |         |     Y1      | Y2-Y3 | Y4-Y5  |
+  * 
+  *     @arg MDB_VEND_CANCEL_SUBCMD: This command can be issued by the
+  *         VMC to cancel a VEND REQUEST command before a
+  *         VEND APPROVED/DENIED has been sent by the payment media
+  *         reader. The payment media reader will respond to VEND CANCEL
+  *         with a VEND DENIED and return to the Session Idle state.
+  * 
+  *             |  VEND   | Vend Cancel |
+  *             |(13h/63h)|      01h    |
+  *             |         |      Y1     |
+  *
+  *     @arg MDB_VEND_SUCCESS_SUBCMD: The selected product has been successfully dispensed.
+  * 
+  *             |  VEND   | Vend Success |  Item  |
+  *             |(13h/63h)|      02h     | Number |
+  *             |         |      Y1      |  Y2-Y3 |
+  * 
+  *     @arg MDB_VEND_FAILURE_SUBCMD: A vend has been attempted at the VMC
+  *         but a problem has been detected and the vend has failed.
+  *         The product was not dispensed. Funds should be refunded to user’s account.
+  * 
+  *             |  VEND   | Vend Failure |
+  *             |(13h/63h)|      03h     |
+  *             |         |      Y1      |
+  * 
+  *     @arg MDB_VEND_SESS_COMPL_SUBCMD: This tells the payment media reader that the session
+  *         is complete and to return to the Enabled state. SESSION COMPLETE is part of a 
+  *         command/response sequence that requires an END SESSION response from the reader.
+  * 
+  *             |  VEND   | Session Complete |
+  *             |(13h/63h)|       04h        |
+  *             |         |       Y1         |
+  * 
+  *     @arg MDB_VEND_CASH_SALE_SUBCMD: A cash sale (cash only or cash and cashless) has been
+  *             successfully completed by the VMC. 
+  * 
+  *             |  VEND   | Cash Sale | Item  |  Item  |
+  *             |(13h/63h)|     05h   | Price | Number |
+  *             |         |     Y1    | Y2-Y3 | Y4-Y5  |
+  * 
+  *             |  VEND   | Cash Sale | Item  |  Item  |   Item   |
+  *             |(13h/63h)|     05h   | Price | Number | Currency |
+  *             |         |     Y1    | Y2-Y5 | Y6-Y7  |  Y8-Y9   |
+  *             Level 3 (EXPANDED CURRENCY MODE)
+  * 
+  *     @arg MDB_VEND_NEG_REQ_SUBCMD: The patron has inserted an item.
+  *             The VMC is requesting negative vend approval from the payment media
+  *             reader before accepting the returned product.
+  * 
+  *             |  VEND   | Neg Vend request | Item  |  Item  |
+  *             |(13h/63h)|        06h       | Price | Number |
+  *             |         |        Y1        | Y2-Y3 | Y4-Y5  |
+  *             Level 3 (EXPANDED CURRENCY MODE disabled)
+  * 
+  * @param  data: Array of data
+  * @retval None
+  */
 void MdbVendCmd(uint8_t subcmd, uint8_t * data)
 {
     uint8_t len = 5;
@@ -227,21 +609,84 @@ void MdbVendCmd(uint8_t subcmd, uint8_t * data)
     MdbSendCmd(MDB_VEND_CMD, subcmd, data, len);
 }
 
+/**
+  * @brief  
+  * 
+  * @param  subcmd: Sub-command.
+  *   This parameter can be one of the following values:
+  *     @arg MDB_READER_DISABLE_SUBCMD: This informs the payment media reader that it has been disabled,
+  *         i.e. it should no longer accept a patron’s payment media for the purpose of vending.
+  *         Vending activities may be re-enabled using the READER ENABLE command. The payment media reader
+  *         should retain all SETUP information.
+  *  
+  *             |  Reader | Disable |
+  *             |(14h/64h)|   00h   |
+  *             |         |   Y1    |
+  * 
+  *     @arg MDB_READER_ENABLE_SUBCMD: This informs the payment media reader that is has been enabled,
+  *         i.e. it should now accept a patron’s payment media for vending purposes. This command must be issued
+  *         to a reader in the Disabled state to enable vending operations.
+  * 
+  *             |  Reader | Enable  |
+  *             |(14h/64h)|   01h   |
+  *             |         |   Y1    |
+  * 
+  *     @arg MDB_READER_CANCEL_SUBCMD: This command is issued to abort payment media reader activities which occur
+  *         in the Enabled state. It is the first part of a command/response sequence which requires a CANCELLED
+  *         response from the reader. 
+  * 
+  *             |  Reader | Cancel |
+  *             |(14h/64h)|  02h   |
+  *             |         |  Y1    |
+  * 
+  * @param  data: Array of data
+  * @retval None
+  */
 void MdbReaderCmd(uint8_t subcmd, uint8_t * data)
 {
     uint8_t len = 1;
-    if (subcmd == MDB_READER_DATA_RESP_SUBCMD &&
-        mdb_dev.level == MDB_LEVEL_3)
-    {
-        len = 8;
-    }
 
     MdbSendCmd(MDB_READER_CMD, subcmd, data, len);
 }
 
+/**
+  * @brief  
+  * 
+  * @param  subcmd: Sub-command.
+  *   This parameter can be one of the following values:
+  *     @arg MDB_REVALUE_REQ_SUBCMD: A balance in the VMC account because coins or bills
+  *         were accepted or some balance is left after a vend. With this command the VMC tries
+  *         to transfer the balance to the payment media.
+  * 
+  *             | Revalue | Revalue Request | Revalue |
+  *             |(15h/65h)|       00h       |  Amount |
+  *             |         |       Y1        |  Y2-Y3  |
+  *             Level 2/3
+  * 
+  *             | Revalue | Revalue Request | Revalue |
+  *             |(15h/65h)|       00h       |  Amount |
+  *             |         |       Y1        |  Y2-Y5  |
+  *             Level 3 (EXPANDED CURRENCY MODE)
+  * 
+  *     @arg MDB_REVALUE_LIM_REQ_SUBCMD: In a configuration with a bill and/or coin
+  *         acceptor and payment media reader connected to a VMC, the VMC must know
+  *         the maximum amount the payment media reader eventually will accept by a
+  *         REVALUE REQUEST. Especially if the bill acceptor accepts a wide range
+  *         of bills. Otherwise the VMC may be confronted by the situation where it
+  *         accepted a high value bill and is unable to pay back cash or revalue it
+  *         to a payment media. (see also below)
+  * 
+  *             | Revalue | Revalue Limit Request |
+  *             |(15h/65h)|           01h         |
+  *             |         |           Y1          |
+  *             Level 2/3
+  * 
+  * @param  data: Array of data
+  * @retval None
+  */
 void MdbRevalueCmd(uint8_t subcmd, uint8_t * data)
 {
-    uint8_t len = 2;
+    uint8_t len = 3;
 
     if (mdb_dev.level == MDB_LEVEL_1)
     {
@@ -250,18 +695,9 @@ void MdbRevalueCmd(uint8_t subcmd, uint8_t * data)
 
     switch(subcmd)
     {
-        case MDB_REVALUE_REQ_SUBCMD:
-            {
-                if (subcmd == MDB_READER_DATA_RESP_SUBCMD &&
-                    mdb_dev.level == MDB_LEVEL_3)
-                {
-                    len = 4;
-                }
-                break;
-            }
         case MDB_REVALUE_LIM_REQ_SUBCMD:
             {
-                len = 0;
+                len = 1;
                 break;
             }
         default: break;
@@ -384,7 +820,7 @@ uint16_t MdbGetRxCh(uint8_t idx)
 
 mdb_ret_resp_t MdbReceiveChar(uint16_t ch)
 {
-    mdb_ret_resp_t ret = MDB_RET_IN_PROG;
+    mdb_ret_resp_t ret = MDB_RET_IN_PROGRESS;
 
     mdb_dev.rx_data[mdb_dev.rx_len] = ch;
     mdb_dev.rx_len++;
@@ -422,7 +858,7 @@ static mdb_ret_resp_t MdbParseData(uint8_t len)
     if (MdbIsValidateChk(mdb_dev.rx_data, mdb_dev.rx_len))
     {
         MdbParseResponse();
-        return MDB_RET_DATA;
+        return MDB_RET_OK_DATA;
     }
     else
     {
@@ -430,7 +866,7 @@ static mdb_ret_resp_t MdbParseData(uint8_t len)
     }
 }
 
-static void MdbParseResponse(void)
+static mdb_ret_resp_t MdbParseResponse(void)
 {
     uint8_t resp_header = mdb_dev.rx_data[0];
 
@@ -438,36 +874,43 @@ static void MdbParseResponse(void)
     {
         case MDB_POLL_JUST_RESET_RESP:
             {
-                mdb_dev.state = MDB_STATE_DISABLED;
-                break;
+                mdb_dev.state = MDB_STATE_INACTIVE;
+                return MDB_RET_OK_DATA;
             }
         case MDB_POLL_CONFIG_RESP:
             {
+                mdb_dev.state = MDB_STATE_DISABLED;
+
                 mdb_dev.dev_slave.country_code = (mdb_dev.rx_data[2] << 8) + mdb_dev.rx_data[3];
                 if (mdb_dev.dev_slave.country_code != MDB_CURRENCY_CODE_RUB_1 ||
                     mdb_dev.dev_slave.country_code != MDB_CURRENCY_CODE_RUB_1)
                 {
-                    mdb_dev.state = MDB_STATE_INACTIVE;
-                    return;
+                    return MDB_RET_ERROR_CURRENCY_CODE;
                 }
+
                 mdb_dev.dev_slave.level             = mdb_dev.rx_data[1];
                 mdb_dev.dev_slave.scale_factor      = mdb_dev.rx_data[4];
                 mdb_dev.dev_slave.decimal_places    = mdb_dev.rx_data[5];
-                mdb_dev.dev_slave.max_resp_time     = mdb_dev.rx_data[6];
                 mdb_dev.dev_slave.misc              = mdb_dev.rx_data[7];
 
                 if (mdb_dev.level > mdb_dev.dev_slave.level)
                 {
-                    MdbSetSlaveAddr(mdb_dev.dev_slave.level);
+                    mdb_dev.level = mdb_dev.dev_slave.level;
+                    mdb_dev.dev_slave.max_resp_time = mdb_dev.rx_data[6];
+                    return MDB_RET_CHANGE_LEVEL;
                 }
 
-                MdbUpdateNonRespTime(mdb_dev.dev_slave.max_resp_time);
+                if (mdb_dev.dev_slave.max_resp_time != mdb_dev.rx_data[6])
+                {
+                    mdb_dev.dev_slave.max_resp_time = mdb_dev.rx_data[6];
+                    return MDB_RET_UPDATE_RESPONSE_TIME;
+                }
 
-                mdb_dev.state = MDB_STATE_ENABLED;
-                break;
+                return MDB_RET_OK_DATA;
+                // MdbUpdateNonRespTime(mdb_dev.dev_slave.max_resp_time);
             }
         case MDB_POLL_DISPLAY_REQ_RESP:
-            break;
+            return MDB_RET_OK_DATA;
         case MDB_POLL_BEGIN_SESSION_RESP:
             {
                 mdb_dev.state = MDB_STATE_SESSION_IDLE;
@@ -626,6 +1069,16 @@ mdb_level_t MdbGetLevel(void)
     return mdb_dev.level;
 }
 
+void MdbSetLevel(mdb_level_t level)
+{
+    mdb_dev.level = level;
+}
+
+void MdbSetExpansion(bool is_exp)
+{
+    mdb_dev.is_expansion_en = is_exp;
+}
+
 static void MdbUpdateNonRespTime(uint8_t time)
 {
     if (mdb_dev.update_resp_time_cb == NULL)
@@ -634,6 +1087,7 @@ static void MdbUpdateNonRespTime(uint8_t time)
     mdb_dev.update_resp_time_cb(time);
 }
 
+#ifndef TEST_MDB
 void MdbUsartInit(void)
 {
     USART_InitTypeDef USART_InitStructure;
@@ -701,6 +1155,7 @@ void MdbUsartInit(void)
 
     USART_Cmd(USART2, ENABLE);
 }
+#endif
 
 void MdbPrint(void)
 {
