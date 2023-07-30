@@ -844,8 +844,8 @@ static mdb_ret_resp_t MdbParseData(uint8_t len)
 
     if (MdbIsValidateChk(mdb_dev.rx_data, mdb_dev.rx_len))
     {
-        MdbParseResponse();
-        return MDB_RET_OK_DATA;
+        ret = MdbParseResponse();
+        return ret;
     }
     else
     {
@@ -859,18 +859,20 @@ static mdb_ret_resp_t MdbParseResponse(void)
 
     switch(resp_header)
     {
+        /* Not resp, only POLL */
         case MDB_POLL_JUST_RESET_RESP:
             {
                 mdb_dev.state = MDB_STATE_INACTIVE;
                 return MDB_RET_OK_DATA;
             }
+        /* Resp & POLL */
         case MDB_POLL_CONFIG_RESP:
             {
                 mdb_dev.state = MDB_STATE_DISABLED;
 
                 mdb_dev.dev_slave.country_code = (mdb_dev.rx_data[2] << 8) + mdb_dev.rx_data[3];
                 if (mdb_dev.dev_slave.country_code != MDB_CURRENCY_CODE_RUB_1 ||
-                    mdb_dev.dev_slave.country_code != MDB_CURRENCY_CODE_RUB_1)
+                    mdb_dev.dev_slave.country_code != MDB_CURRENCY_CODE_RUB_2)
                 {
                     return MDB_RET_ERROR_CURRENCY_CODE;
                 }
@@ -884,7 +886,7 @@ static mdb_ret_resp_t MdbParseResponse(void)
                 {
                     mdb_dev.level = mdb_dev.dev_slave.level;
                     mdb_dev.dev_slave.max_resp_time = mdb_dev.rx_data[6];
-                    return MDB_RET_CHANGE_LEVEL;
+                    return MDB_RET_UPDATE_LEVEL;
                 }
 
                 if (mdb_dev.dev_slave.max_resp_time != mdb_dev.rx_data[6])
@@ -896,29 +898,39 @@ static mdb_ret_resp_t MdbParseResponse(void)
                 return MDB_RET_OK_DATA;
                 // MdbUpdateNonRespTime(mdb_dev.dev_slave.max_resp_time);
             }
+        /* Not resp, only POLL */
         case MDB_POLL_DISPLAY_REQ_RESP:
+            // TODO Проверить функционал вендисты
             return MDB_RET_OK_DATA;
+        /* Not resp, only POLL */
         case MDB_POLL_BEGIN_SESSION_RESP:
             {
                 mdb_dev.state = MDB_STATE_SESSION_IDLE;
-                MdbSelectItem();
-                break;
+                // TODO Проверить что приходит
+                // MdbSelectItem();
+                return MDB_RET_OK_DATA;
+                // break;
             }
+        /* Not resp, only POLL p134 */
         case MDB_POLL_SESS_CANCEL_RESP:
             {
-                MdbSessionCancel();
-                break;
+                return MDB_RET_SESS_CANCEL;
+                // MdbSessionCancel();
+                // break;
             }
+        /* Resp & POLL */
         case MDB_POLL_VEND_APPROVED_RESP:
             {
                 MdbVendApproved();
                 break;
             }
+        /* Resp & POLL */
         case MDB_POLL_VEND_DENIED_RESP:
             {
                 MdbVendDenied();
                 break;
             }
+        /* Resp & POLL */
         case MDB_POLL_END_SESSION_RESP:
             {
                 mdb_dev.state = MDB_STATE_ENABLED;
@@ -926,10 +938,12 @@ static mdb_ret_resp_t MdbParseResponse(void)
                 // Check max non-response time!
                 break;
             }
+        /* Resp & POLL */
         case MDB_POLL_CANCELLED_RESP:
             {
                 break;
             }
+        /* Resp & POLL */
         case MDB_POLL_PERIPH_ID_RESP:
             {
                 for (uint8_t i = 0; i < 3; i++)
@@ -941,6 +955,7 @@ static mdb_ret_resp_t MdbParseResponse(void)
                 mdb_dev.dev_slave.sw_version = (mdb_dev.rx_data[28] << 8) + mdb_dev.rx_data[29];
                 break;
             }
+        /* Not resp, only POLL */
         case MDB_POLL_ERROR_RESP:
             {
                 switch(mdb_dev.rx_data[1])
@@ -963,6 +978,7 @@ static mdb_ret_resp_t MdbParseResponse(void)
                 }
                 break;
             }
+        /* Not resp, only POLL */
         case MDB_POLL_OUT_OF_SEQ_RESP:
             {
                 switch(mdb_dev.rx_data[1])
@@ -980,20 +996,24 @@ static mdb_ret_resp_t MdbParseResponse(void)
                 }
                 break;
             }
+        /* Resp & POLL */
         case MDB_POLL_REVAL_APPR_RESP:
             {
                 MdbRevalueApproved();
                 break;
             }
+        /* Resp & POLL */
         case MDB_POLL_REVAL_DENIED_RESP:
             {
                 MdbRevalueDenied();
                 break;
             }
+        /* Resp & POLL */
         case MDB_POLL_REVAL_LIMIT_RESP:
             {
                 break;
             }
+        /* Not resp, only POLL */
         case MDB_POLL_TIME_DATA_RESP:
             {
                 break;

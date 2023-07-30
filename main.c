@@ -29,21 +29,21 @@ void main()
 {
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
 
-    //ConsoleInit();
-    //PRINT_OS("\r\n");
+    ConsoleInit();
+    PRINT_OS("\r\n");
 
-    //HwAdcInit();
-    //HwRevPrint();
-    //HwVoltPrint();
+    // //HwAdcInit();
+    // //HwRevPrint();
+    // //HwVoltPrint();
 
-    MdbOsInit();
-    // for(int i = 0; i < 50000; i++)
-    // {
-    //     asm("NOP");
-    // }
-    //MdbPrint();
+    // MdbOsInit();
+    // // for(int i = 0; i < 50000; i++)
+    // // {
+    // //     asm("NOP");
+    // // }
+    // //MdbPrint();
 
-    //ConsoleCliStart();
+    ConsoleCliStart();
 
     xTaskCreate(
         vTaskCode,
