@@ -29,6 +29,7 @@
   */
 
 extern void UART1InterruptHandler();
+extern void UART3InterruptHandler();
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
@@ -135,6 +136,20 @@ void DebugMon_Handler(void)
 void USART1_IRQHandler(void)
 {
     UART1InterruptHandler();
+}
+
+/**
+  * @}
+  */
+
+/**
+  * @brief  This function handles PPP interrupt request.
+  * @param  None
+  * @retval None
+  */
+void USART3_IRQHandler(void)
+{
+    UART3InterruptHandler();
 }
 
 /**

@@ -14,7 +14,7 @@ volatile    uint8_t     TxIndex = 0;
 volatile    uint8_t*    pTxData;
 QueueHandle_t fdBuferConsoleRec;
 
-void UART1InterruptHandler(void)  // GPRS модем
+void UART1InterruptHandler(void)
 {
     if(USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)
     {

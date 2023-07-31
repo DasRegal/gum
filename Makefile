@@ -37,7 +37,8 @@ INCLUDE = -I./ \
 	  -I./src/console/rcli \
 	  -I./src/hw_rev_adc \
 	  -I./src/hw_voltage_adc \
-	  -I./src/mdb
+	  -I./src/mdb \
+	  -I./src/cctalk
 
 SRCS = 	./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
 	./stm32f10x_it.c \
@@ -64,6 +65,8 @@ SRCS = 	./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
 	./src/hw_voltage_adc/hw_voltage_adc.c \
 	./src/mdb/mdb.c \
 	./src/mdb/mdb_os.c \
+	./src/cctalk/cctalk.c \
+	./src/cctalk/coinbox.c \
 	./main.c
 
 OBJS=$(SRCS:.c=.o)
