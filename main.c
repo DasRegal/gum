@@ -14,6 +14,7 @@
 #include "src/hw_voltage_adc/hw_voltage_adc.h"
 #include "src/hw_adc.h"
 #include "src/mdb/mdb_os.h"
+#include "src/cctalk/coinbox.h"
 
 SemaphoreHandle_t semTickPulse;
 
@@ -44,6 +45,8 @@ void main()
     // //MdbPrint();
 
     ConsoleCliStart();
+
+    CoinBoxInit();
 
     xTaskCreate(
         vTaskCode,

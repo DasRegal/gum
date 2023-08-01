@@ -7,6 +7,7 @@
 #include "version.h"
 #include "buf.h"
 #include "mdb.h"
+#include "coinbox.h"
 
 extern void UsartDebugSendString(const char *pucBuffer);
 
@@ -166,6 +167,7 @@ char status_func_cmd(unsigned char args, void* argv)
 char help_func_cmd(unsigned char args, void* argv);
 char console_func_cmd(unsigned char args, void* argv);
 char mdb_func_cmd(unsigned char args, void* argv);
+char cctalk_func_cmd(unsigned char args, void* argv);
 
 typedef char (*cb_t)(unsigned char args, void* argv);
 typedef struct
@@ -177,6 +179,7 @@ typedef struct
 
 rcli_cmd_t rcli_commands[] = 
 {
+    { 1, (char*[]){ "cctalk", NULL }, cctalk_func_cmd },
     { 3, (char*[]){ "cmd", "ddd", "q", NULL }, cmd_func_cmd },
     { 1, (char*[]){ "console", NULL}, console_func_cmd },
     { 1, (char*[]){ "echo", NULL}, echo_func_cmd },
@@ -277,6 +280,40 @@ char console_func_cmd(unsigned char args, void* argv)
     sprintf(rcli_out_buf, "Bad params\r\n");
     RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
     return -1;
+}
+
+char cctalk_func_cmd(unsigned char args, void* argv)
+{
+    char * help_str = 
+"Usage: cctalk <header> <data_1> [<data_n>]\r\n\r\n";
+
+    uint16_t i;
+    char buf[10];
+    cctalk_data_t data = { .buf = buf };
+
+    if (args == 1)
+    {
+        sprintf(rcli_out_buf, "%s", help_str);
+        RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+        return 0;
+    }
+
+    for(uint8_t i = 1; i < args; i++)
+    {
+        buf[i - 1] = (uint16_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * i, NULL, 10);
+    }
+
+    data.dest_addr = 2;
+    data.src_addr  = 1;
+    data.buf_len   = args - 2;
+    data.header   = (uint16_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * 1, NULL, 10);
+    for ( i = 0; i < args - 2; i++ )
+    {
+        data.buf[i + 4] = (uint16_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * (i + 2), NULL, 16);
+    }
+
+    CctalkSendData(data);
+    return 0;
 }
 
 char rcli_parse_cmd(ctrlBuf_s bufStruct)
