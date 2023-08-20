@@ -66,6 +66,10 @@ typedef enum
     MDB_RET_UPDATE_RESPONSE_TIME,
     MDB_RET_ERROR_CURRENCY_CODE,
     MDB_RET_NOT_ANSWER,
+    MDB_RET_VEND_APPROVED,
+    MDB_RET_VEND_DENIED,
+    MDB_RET_REVALUE_APPROVED,
+    MDB_RET_REVALUE_DENIED,
     MDB_RET_SESS_CANCEL
 } mdb_ret_resp_t;
 
@@ -85,11 +89,7 @@ typedef struct
     void            (*send_callback)(const uint16_t*, uint8_t);
     void            (*select_item_cb)(void);
     void            (*session_cancel_cb)(void);
-    void            (*vend_approved_cb)(void);
-    void            (*vend_denied_cb)(void);
     void            (*update_resp_time_cb)(uint8_t);
-    void            (*reval_apprv_cb)(void);
-    void            (*reval_denied_cb)(void);
 } mdv_dev_init_struct_t;
 //void MdbPrint(void);
 //void MdbBufSend(const uint16_t *pucBuffer, uint8_t len);

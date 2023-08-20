@@ -24,17 +24,15 @@ static void MdbBufSend(const uint16_t *pucBuffer, uint8_t len);
 static void MdbOsSelectItem(void);
 static void MdbOsSessionCancel(void);
 static void MdbOsVendApproved(void);
-static void MdbOsVendDenied(void);
 static void MdbOsUpdateNonRespTime(uint8_t time);
-static void MdbOsRevalueApproved(void);
-static void MdbOsRevalueDenied(void);
-static void MdbOsSetupSeq(EventBits_t flags;);
+static void MdbOsSetupSeq(EventBits_t flags);
+static void MdbOsReset(void);
 
 void VmcChooseItem(uint16_t price, uint16_t item);
 
 QueueHandle_t       fdBuferMdbRec;
 SemaphoreHandle_t   mdb_transfer_sem;
-SemaphoreHandle_t   mdb_start_rx_sem;
+// SemaphoreHandle_t   mdb_start_rx_sem;
 SemaphoreHandle_t   mdb_poll_sem;
 EventGroupHandle_t  xCreatedEventGroup;
 EventGroupHandle_t  xSetupSeqEg; 
@@ -86,6 +84,20 @@ void vTaskMdbRecBuf ( void *pvParameters)
                 case MDB_RET_IDLE:
                     xSemaphoreGive(mdb_transfer_sem);
                     continue;
+                case MDB_RET_VEND_APPROVED:
+                    xEventGroupSetBits(xCreatedEventGroup, MDB_OS_VEND_APPROVED);
+                    continue;
+                case MDB_RET_VEND_DENIED:
+                    MdbSendCommand(MDB_VEND_CMD_E, MDB_VEND_SESS_COMPL_SUBCMD, NULL);
+                    // MdbVendCmd(MDB_VEND_SESS_COMPL_SUBCMD, NULL);
+                    continue;
+                case MDB_RET_REVALUE_APPROVED:
+                    continue;
+                case MDB_RET_REVALUE_DENIED:
+                    continue;
+                case MDB_RET_REPEAT:
+                    /* Check sum is not valid*/
+                    continue;
                 default:
                     break;
             }
@@ -126,14 +138,16 @@ void vTaskMdbPoll ( void *pvParameters)
 
             buf[0] = (item >> 8) & 0xFF;
             buf[1] = item & 0xFF;
-            MdbVendCmd(MDB_VEND_SUCCESS_SUBCMD, buf);
+            MdbSendCommand(MDB_VEND_CMD_E, MDB_VEND_SUCCESS_SUBCMD, buf);
+            // MdbVendCmd(MDB_VEND_SUCCESS_SUBCMD, buf);
             continue;
         }
 
         if (flags & MDB_OS_SESS_CANCEL)
         {
             xEventGroupClearBits(xCreatedEventGroup, MDB_OS_SESS_CANCEL);
-            MdbVendCmd(MDB_VEND_SESS_COMPL_SUBCMD, NULL);
+            MdbSendCommand(MDB_VEND_CMD_E, MDB_VEND_SESS_COMPL_SUBCMD, NULL);
+            // MdbVendCmd(MDB_VEND_SESS_COMPL_SUBCMD, NULL);
             continue;
         }
 
@@ -173,14 +187,15 @@ void vTimerNonRespCb( TimerHandle_t xTimer )
     mdb_count_non_resp--;
     if (mdb_count_non_resp == 0)
     {
-        mdb_count_non_resp = MDB_COUNT_NON_RESP;
-        /* RESTART */
-        xEventGroupSetBits(xSetupSeqEg, MDB_OS_IS_SETUP_FLAG);
-        xSemaphoreGive(mdb_transfer_sem);
+        // mdb_count_non_resp = MDB_COUNT_NON_RESP;
+        // /* RESTART */
+        // xEventGroupSetBits(xSetupSeqEg, MDB_OS_IS_SETUP_FLAG);
+        // xSemaphoreGive(mdb_transfer_sem);
+        MdbOsReset();
     }
 }
 
-void MdbOsInit(void)
+static void MdbOsReset(void)
 {
     mdv_dev_init_struct_t mdb_dev_struct;
 
@@ -189,15 +204,19 @@ void MdbOsInit(void)
     mdb_dev_struct.send_callback        = MdbBufSend;
     mdb_dev_struct.select_item_cb       = MdbOsSelectItem;
     mdb_dev_struct.session_cancel_cb    = MdbOsSessionCancel;
-    mdb_dev_struct.vend_approved_cb     = MdbOsVendApproved;
-    mdb_dev_struct.vend_denied_cb       = MdbOsVendDenied;
     mdb_dev_struct.update_resp_time_cb  = MdbOsUpdateNonRespTime;
-    mdb_dev_struct.reval_apprv_cb       = MdbOsRevalueApproved;
-    mdb_dev_struct.reval_denied_cb      = MdbOsRevalueDenied;
     MdbInit(mdb_dev_struct);
 
+    xSemaphoreTake(mdb_poll_sem, 0);
+    xSemaphoreGive(mdb_transfer_sem);
+    xEventGroupSetBits(xSetupSeqEg, MDB_OS_IS_SETUP_FLAG);
+}
+
+void MdbOsInit(void)
+{
+
     vSemaphoreCreateBinary(mdb_transfer_sem);
-    vSemaphoreCreateBinary(mdb_start_rx_sem);
+    // vSemaphoreCreateBinary(mdb_start_rx_sem);
     vSemaphoreCreateBinary(mdb_poll_sem);
 
     xNonResponseTimer = xTimerCreate ( "NonRespTimer", 
@@ -206,12 +225,12 @@ void MdbOsInit(void)
                            ( void * ) 0,
                            vTimerNonRespCb );
     
-    xSemaphoreTake(mdb_poll_sem, 0);
-
     fdBuferMdbRec = xQueueCreate(256, sizeof(uint16_t));
     xCreatedEventGroup = xEventGroupCreate();
     xSetupSeqEg = xEventGroupCreate();
-    xEventGroupSetBits(xSetupSeqEg, MDB_OS_IS_SETUP_FLAG);
+
+    MdbOsReset();
+
     MdbUsartInit();
     
     xTaskCreate(
@@ -249,7 +268,8 @@ static void MdbOsSetupSeq(EventBits_t flags)
         buf[1] = 0;
         buf[2] = 0;
         buf[3] = 0;
-        MdbSetupCmd(MDB_SETUP_CONF_DATA_SUBCMD, buf);
+        MdbSendCommand(MDB_SETUP_CMD_E, MDB_SETUP_CONF_DATA_SUBCMD, buf);
+        // MdbSetupCmd(MDB_SETUP_CONF_DATA_SUBCMD, buf);
         return;
     }
 
@@ -259,7 +279,8 @@ static void MdbOsSetupSeq(EventBits_t flags)
         buf[1] = 100;   /* Max price */
         buf[2] = 0;
         buf[3] = 0;     /* Min price */
-        MdbSetupCmd(MDB_SETUP_PRICE_SUBCMD, buf);
+        MdbSendCommand(MDB_SETUP_CMD_E, MDB_SETUP_PRICE_SUBCMD, buf);
+        // MdbSetupCmd(MDB_SETUP_PRICE_SUBCMD, buf);
         return;
     }
 
@@ -269,7 +290,8 @@ static void MdbOsSetupSeq(EventBits_t flags)
         memcpy(buf + 3,           serial_number,            12);
         memcpy(buf + 3 + 12,      model_number,             12);
         memcpy(buf + 3 + 12 + 12, sw_version_bcd,           2);
-        MdbExpansionCmd(MDB_EXP_REQ_ID_SUBCMD, buf);
+        MdbSendCommand(MDB_EXPANSION_CMD_E, MDB_EXP_REQ_ID_SUBCMD, buf);
+        // MdbExpansionCmd(MDB_EXP_REQ_ID_SUBCMD, buf);
         return;
     }
 
@@ -304,30 +326,11 @@ static void MdbOsSessionCancel(void)
     xEventGroupSetBits(xCreatedEventGroup, MDB_OS_SESS_CANCEL);
 }
 
-static void MdbOsVendApproved(void)
-{
-    xEventGroupSetBits(xCreatedEventGroup, MDB_OS_VEND_APPROVED);
-}
-
-static void MdbOsVendDenied(void)
-{
-    MdbVendCmd(MDB_VEND_SESS_COMPL_SUBCMD, NULL);
-}
 
 static void MdbOsUpdateNonRespTime(uint8_t time)
 {
     xTimerChangePeriod(xNonResponseTimer, time + 5, 0);
     xTimerStop(xNonResponseTimer, 0);
-}
-
-static void MdbOsRevalueApproved(void)
-{
-
-}
-
-static void MdbOsRevalueDenied(void)
-{
-
 }
 
 void DMA1_Channel7_IRQHandler(void)
@@ -340,8 +343,8 @@ void DMA1_Channel7_IRQHandler(void)
         USART_DMACmd(USART2, USART_DMAReq_Tx, DISABLE);
         DMA_ITConfig(DMA1_Channel7, DMA_IT_TC, DISABLE);
 
-        xSemaphoreGiveFromISR(mdb_start_rx_sem, &xHigherPriorityTaskWoken);
-        if(xHigherPriorityTaskWoken == pdTRUE) taskYIELD();
+        // xSemaphoreGiveFromISR(mdb_start_rx_sem, &xHigherPriorityTaskWoken);
+        // if(xHigherPriorityTaskWoken == pdTRUE) taskYIELD();
 
         xTimerStartFromISR(xNonResponseTimer, &xHigherPriorityTaskWoken);
         if(xHigherPriorityTaskWoken == pdTRUE) taskYIELD();
@@ -374,5 +377,6 @@ void VmcChooseItem(uint16_t price, uint16_t item)
     buf[1] = price & 0xFF;
     buf[2] = (item >> 8) & 0xFF;
     buf[3] = item & 0xFF;
-    MdbVendCmd(MDB_VEND_REQ_SUBCMD, buf);
+    MdbSendCommand(MDB_VEND_CMD_E, MDB_VEND_REQ_SUBCMD, buf);
+    // MdbVendCmd(MDB_VEND_REQ_SUBCMD, buf);
 }

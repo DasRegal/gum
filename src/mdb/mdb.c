@@ -118,10 +118,7 @@ static mdb_ret_resp_t MdbParseData(uint8_t len);
 static mdb_ret_resp_t MdbParseResponse(void);
 static void MdbSelectItem(void);
 static void MdbSessionCancel(void);
-static void MdbVendApproved(void);
 static void MdbVendDenied(void);
-static void MdbRevalueApproved(void);
-static void MdbRevalueDenied(void);
 static void MdbUpdateNonRespTime(uint8_t time);
 
 typedef enum
@@ -294,11 +291,7 @@ typedef struct
     void            (*send_callback)(const uint16_t*, uint8_t);
     void            (*select_item_cb)(void);
     void            (*session_cancel_cb)(void);
-    void            (*vend_approved_cb)(void);
-    void            (*vend_denied_cb)(void);
     void            (*update_resp_time_cb)(uint8_t);
-    void            (*reval_apprv_cb)(void);
-    void            (*reval_denied_cb)(void);
     mdb_dev_slave_t dev_slave;
     mdb_state_t     state;
 } mdb_dev_t;
@@ -312,11 +305,7 @@ void MdbInit(mdv_dev_init_struct_t dev_struct)
     mdb_dev.send_callback   = dev_struct.send_callback;
     mdb_dev.select_item_cb  = dev_struct.select_item_cb;
     mdb_dev.session_cancel_cb = dev_struct.session_cancel_cb;
-    mdb_dev.vend_approved_cb= dev_struct.vend_approved_cb;
-    mdb_dev.vend_denied_cb  = dev_struct.vend_denied_cb;
     mdb_dev.update_resp_time_cb = dev_struct.update_resp_time_cb;
-    mdb_dev.reval_apprv_cb  = dev_struct.reval_apprv_cb;
-    mdb_dev.reval_denied_cb = dev_struct.reval_denied_cb;
     mdb_dev.rx_len          = 0;
     mdb_dev.level           = MDB_LEVEL_2;
     mdb_dev.state           = MDB_STATE_INACTIVE;
@@ -402,6 +391,17 @@ void MdbSetupCmd(uint8_t subcmd, uint8_t * data)
     // MdbSendCmd(MDB_SETUP_CMD, subcmd, data, len);
 }
 
+/**
+  * @brief  Setup reader
+  * @param  cmd:
+  *                 MDB_RESET_CMD_E
+  *                 MDB_SETUP_CMD_E
+  *                 MDB_POLL_CMD_E
+  *                 MDB_VEND_CMD_E
+  *                 MDB_READER_CMD_E
+  *                 MDB_REVALUE_CMD_E
+  *                 MDB_EXPANSION_CMD_E
+*/
 void MdbSendCommand(uint8_t cmd, uint8_t subcmd, uint8_t * data)
 {
     uint8_t size = 0;
@@ -810,6 +810,14 @@ mdb_ret_resp_t MdbReceiveChar(uint16_t ch)
     mdb_ret_resp_t ret = MDB_RET_IN_PROGRESS;
 
     mdb_dev.rx_data[mdb_dev.rx_len] = ch;
+
+    if (mdb_dev.rx_len > MDB_MAX_BUF_LEN)
+    {
+        mdb_dev.rx_len = 0;
+        mdb_dev.rx_data[0] = 0;
+        return ret;
+    }
+
     mdb_dev.rx_len++;
 
     if (ch & 0x100)
@@ -921,14 +929,12 @@ static mdb_ret_resp_t MdbParseResponse(void)
         /* Resp & POLL */
         case MDB_POLL_VEND_APPROVED_RESP:
             {
-                MdbVendApproved();
-                break;
+                return MDB_RET_VEND_APPROVED;
             }
         /* Resp & POLL */
         case MDB_POLL_VEND_DENIED_RESP:
             {
-                MdbVendDenied();
-                break;
+                return MDB_RET_VEND_DENIED;
             }
         /* Resp & POLL */
         case MDB_POLL_END_SESSION_RESP:
@@ -999,14 +1005,12 @@ static mdb_ret_resp_t MdbParseResponse(void)
         /* Resp & POLL */
         case MDB_POLL_REVAL_APPR_RESP:
             {
-                MdbRevalueApproved();
-                break;
+                return MDB_RET_REVALUE_APPROVED;
             }
         /* Resp & POLL */
         case MDB_POLL_REVAL_DENIED_RESP:
             {
-                MdbRevalueDenied();
-                break;
+                return MDB_RET_REVALUE_DENIED;
             }
         /* Resp & POLL */
         case MDB_POLL_REVAL_LIMIT_RESP:
@@ -1038,38 +1042,6 @@ static void MdbSessionCancel(void)
         return;
 
     mdb_dev.session_cancel_cb();
-}
-
-static void MdbVendApproved(void)
-{
-    if (mdb_dev.vend_approved_cb == NULL)
-        return;
-
-    mdb_dev.vend_approved_cb();
-}
-
-static void MdbVendDenied(void)
-{
-    if (mdb_dev.vend_denied_cb == NULL)
-        return;
-
-    mdb_dev.vend_denied_cb();
-}
-
-static void MdbRevalueApproved(void)
-{
-    if (mdb_dev.reval_apprv_cb == NULL)
-        return;
-
-    mdb_dev.reval_apprv_cb();
-}
-
-static void MdbRevalueDenied(void)
-{
-    if (mdb_dev.reval_denied_cb == NULL)
-        return;
-
-    mdb_dev.reval_denied_cb();
 }
 
 mdb_level_t MdbGetLevel(void)
