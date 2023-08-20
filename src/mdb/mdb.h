@@ -96,13 +96,6 @@ typedef struct
 
 void MdbInit(mdv_dev_init_struct_t dev_struct);
 void MdbSetSlaveAddr(uint8_t addr);
-void MdbResetCmd(void);
-void MdbSetupCmd(uint8_t subcmd, uint8_t * data);
-void MdbPollCmd(void);
-void MdbVendCmd(uint8_t subcmd, uint8_t * data);
-void MdbReaderCmd(uint8_t subcmd, uint8_t * data);
-void MdbRevalueCmd(uint8_t subcmd, uint8_t * data);
-void MdbExpansionCmd(uint8_t subcmd, uint8_t * data);
 void MdbAckCmd(void);
 void MdbSendCommand(uint8_t cmd, uint8_t subcmd, uint8_t * data);
 mdb_level_t MdbGetLevel(void);

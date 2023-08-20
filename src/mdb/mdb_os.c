@@ -89,7 +89,6 @@ void vTaskMdbRecBuf ( void *pvParameters)
                     continue;
                 case MDB_RET_VEND_DENIED:
                     MdbSendCommand(MDB_VEND_CMD_E, MDB_VEND_SESS_COMPL_SUBCMD, NULL);
-                    // MdbVendCmd(MDB_VEND_SESS_COMPL_SUBCMD, NULL);
                     continue;
                 case MDB_RET_REVALUE_APPROVED:
                     continue;
@@ -139,7 +138,6 @@ void vTaskMdbPoll ( void *pvParameters)
             buf[0] = (item >> 8) & 0xFF;
             buf[1] = item & 0xFF;
             MdbSendCommand(MDB_VEND_CMD_E, MDB_VEND_SUCCESS_SUBCMD, buf);
-            // MdbVendCmd(MDB_VEND_SUCCESS_SUBCMD, buf);
             continue;
         }
 
@@ -147,13 +145,12 @@ void vTaskMdbPoll ( void *pvParameters)
         {
             xEventGroupClearBits(xCreatedEventGroup, MDB_OS_SESS_CANCEL);
             MdbSendCommand(MDB_VEND_CMD_E, MDB_VEND_SESS_COMPL_SUBCMD, NULL);
-            // MdbVendCmd(MDB_VEND_SESS_COMPL_SUBCMD, NULL);
             continue;
         }
 
         if (xSemaphoreTake(mdb_poll_sem, 0) == pdTRUE)
         {
-            MdbPollCmd();
+            MdbSendCommand(MDB_POLL_CMD_E, 0, NULL);
             continue;
         }
 
@@ -168,7 +165,7 @@ void vTaskMdbPoll ( void *pvParameters)
         }
         
         vTaskDelay(MDB_POLL_TIME);
-        MdbPollCmd();
+        MdbSendCommand(MDB_POLL_CMD_E, 0, NULL);
         continue;
     }
 }
@@ -258,7 +255,7 @@ static void MdbOsSetupSeq(EventBits_t flags)
 
     if (flags & MDB_OS_SETUP_1_FLAG)
     {
-        MdbResetCmd();
+        MdbSendCommand(MDB_RESET_CMD_E, 0, NULL);
         return;
     }
 
@@ -269,7 +266,6 @@ static void MdbOsSetupSeq(EventBits_t flags)
         buf[2] = 0;
         buf[3] = 0;
         MdbSendCommand(MDB_SETUP_CMD_E, MDB_SETUP_CONF_DATA_SUBCMD, buf);
-        // MdbSetupCmd(MDB_SETUP_CONF_DATA_SUBCMD, buf);
         return;
     }
 
@@ -280,7 +276,6 @@ static void MdbOsSetupSeq(EventBits_t flags)
         buf[2] = 0;
         buf[3] = 0;     /* Min price */
         MdbSendCommand(MDB_SETUP_CMD_E, MDB_SETUP_PRICE_SUBCMD, buf);
-        // MdbSetupCmd(MDB_SETUP_PRICE_SUBCMD, buf);
         return;
     }
 
@@ -291,14 +286,13 @@ static void MdbOsSetupSeq(EventBits_t flags)
         memcpy(buf + 3 + 12,      model_number,             12);
         memcpy(buf + 3 + 12 + 12, sw_version_bcd,           2);
         MdbSendCommand(MDB_EXPANSION_CMD_E, MDB_EXP_REQ_ID_SUBCMD, buf);
-        // MdbExpansionCmd(MDB_EXP_REQ_ID_SUBCMD, buf);
         return;
     }
 
     if (flags & MDB_OS_SETUP_5_FLAG)
     {
         xEventGroupClearBits(xSetupSeqEg, MDB_OS_SETUP_5_FLAG);
-        MdbReaderCmd(MDB_READER_ENABLE_SUBCMD, NULL);
+        MdbSendCommand(MDB_READER_CMD_E, MDB_READER_ENABLE_SUBCMD, NULL);
         return;
     }
 }
@@ -378,5 +372,4 @@ void VmcChooseItem(uint16_t price, uint16_t item)
     buf[2] = (item >> 8) & 0xFF;
     buf[3] = item & 0xFF;
     MdbSendCommand(MDB_VEND_CMD_E, MDB_VEND_REQ_SUBCMD, buf);
-    // MdbVendCmd(MDB_VEND_REQ_SUBCMD, buf);
 }
