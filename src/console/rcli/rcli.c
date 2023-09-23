@@ -328,7 +328,9 @@ char cashless_func_cmd(unsigned char args, void* argv)
 "enable on|off\t\tForce enable On\\Off\r\n\
 disable on|off\t\tForce disable On\\Off\r\n";
     char * help_str2 = 
-"show state\t\tShow internal state of Cashless\r\n\r\n";
+"show state\t\tShow internal state of Cashless\r\n";
+    char * help_str3 = 
+"vend <price> <item>\tPush Vend request\r\n\r\n";
 
     if (args == 1)
     {
@@ -338,6 +340,8 @@ disable on|off\t\tForce disable On\\Off\r\n";
         RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
         sprintf(rcli_out_buf, "%s", help_str2);
         RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+        sprintf(rcli_out_buf, "%s", help_str3);
+        RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
         return 0;
     }
 
@@ -346,7 +350,6 @@ disable on|off\t\tForce disable On\\Off\r\n";
         if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "help") == 0 ||
             strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "enable") == 0 ||
             strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "disable") == 0 ||
-            strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "show") == 0 ||
             strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "?") == 0)
         {
             sprintf(rcli_out_buf, "%s", help_str);
@@ -355,8 +358,30 @@ disable on|off\t\tForce disable On\\Off\r\n";
             RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
             sprintf(rcli_out_buf, "%s", help_str2);
             RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+            sprintf(rcli_out_buf, "%s", help_str3);
+            RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
             return 0;
         }
+
+        if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "reset") == 0)
+        {
+            CashlessResetCmd();
+            sprintf(rcli_out_buf, "Cashless reset\r\n");
+            RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+        }
+
+        if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "vend") == 0)
+        {
+            sprintf(rcli_out_buf, "\r\n%s", help_str3);
+            RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+        }
+
+        if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "show") == 0)
+        {
+            sprintf(rcli_out_buf, "\r\n%s\r\n", help_str2);
+            RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+        }
+
         return 0;
     }
 
@@ -366,13 +391,13 @@ disable on|off\t\tForce disable On\\Off\r\n";
         {
             if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 2, "on") == 0)
             {
-                CashlessEnableForce(true);
+                CashlessEnableForceCmd(true);
                 RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
                 return 0;
             }
             if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 2, "off") == 0)
             {
-                CashlessEnableForce(false);
+                CashlessEnableForceCmd(false);
                 RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
                 return 0;
             }
@@ -382,13 +407,13 @@ disable on|off\t\tForce disable On\\Off\r\n";
         {
             if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 2, "on") == 0)
             {
-                CashlessDisableForce(true);
+                CashlessDisableForceCmd(true);
                 RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
                 return 0;
             }
             if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 2, "off") == 0)
             {
-                CashlessDisableForce(false);
+                CashlessDisableForceCmd(false);
                 RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
                 return 0;
             }
@@ -433,6 +458,36 @@ disable on|off\t\tForce disable On\\Off\r\n";
                 RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
                 return 0;
             }
+        }
+    }
+
+    if (args == 4)
+    {
+        if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "vend") == 0)
+        {
+            uint16_t price;
+            uint16_t item;
+
+            price = (uint16_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * 2, NULL, 10);
+            item = (uint16_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * 3, NULL, 10);
+
+            if (price == 0 || item == 0)
+            {
+                sprintf(rcli_out_buf, "Bad params\r\n");
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+                return -1;
+            }
+
+            sprintf(rcli_out_buf, "Price - %d, Item - %d\r\n", price, item);
+            RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+
+            if (CashlessVendRequest(price, item) != 0)
+            {
+                sprintf(rcli_out_buf, "Error. Not Session Idle\r\n");
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+            }
+
+            return 0;
         }
     }
 

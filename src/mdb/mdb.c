@@ -512,6 +512,15 @@ static mdb_ret_resp_t MdbParseData(uint8_t len)
                 if(mdb_dev.send_cmd == MDB_RESET_CMD_E)
                     mdb_dev.state = MDB_STATE_INACTIVE;
 
+                if(mdb_dev.send_cmd == MDB_READER_CMD_E)
+                {
+                    if(mdb_dev.send_subcmd == MDB_READER_ENABLE_SUBCMD)
+                        mdb_dev.state = MDB_STATE_ENABLED;
+
+                    if(mdb_dev.send_subcmd == MDB_READER_DISABLE_SUBCMD)
+                        mdb_dev.state = MDB_STATE_DISABLED;
+                }
+
                 ret = MDB_RET_ACK;
                 break;
             case MDB_NAK:

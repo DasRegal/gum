@@ -85,7 +85,7 @@ cleanall:
 	-find . -name '*.map' -exec rm {} \;
 
 clean:
-	rm -fv ./*.o ./src/*.o ./src/console/*.o ./src/console/rcli/*.o
+	rm -fv ./*.o ./src/*.o ./src/console/*.o ./src/console/rcli/*.o ./src/mdb/*.o ./src/cctalk/*.o
 	rm -fv ./output/*.elf
 	rm -fv ./output/*.lst
 	rm -fv ./output/*.out

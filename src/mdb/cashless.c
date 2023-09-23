@@ -14,6 +14,7 @@
 
 #include "mdb.h"
 #include "serial.h"
+#include "cashless.h"
 
 typedef enum
 {
@@ -30,6 +31,7 @@ typedef struct
     bool isChange;
     bool isVendRequest;
     bool isSessiontimeout;
+    bool isReset;
     cashless_vend_stat_t vendStat;
     uint16_t price;
     uint16_t item;
@@ -98,8 +100,8 @@ cashless_state_t cashless_machine_state[CL_ST_LAST_E][CL_ACT_LAST_E] =
     { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_DISABLE_E        }, /* CL_ST_DISABLE_E        14 00H DISABLE */
     { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_VND_APPR,         CL_ST_VND_DEN,         CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_VEND_REQ         }, /* CL_ST_VEND_REQ         13 00H VEND REQUEST */
     { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_SES_CMPL         }, /* CL_ST_SES_CMPL         13 04H SESSION COMPLETE */
-    { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_POLL_E           }, /* CL_ST_VND_APPR         SET APPROVED */
-    { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_POLL_E           }, /* CL_ST_VND_DEN          SET DENIED */
+    { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_RESET_E,          CL_ST_SES_CMPL,         CL_ST_VND_APPR         }, /* CL_ST_VND_APPR         SET APPROVED */
+    { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_RESET_E,          CL_ST_SES_CMPL,         CL_ST_VND_DEN          }, /* CL_ST_VND_DEN          SET DENIED */
 };
 
 static cashless_state_t curState;
@@ -159,9 +161,10 @@ static void CashlessStateVendDenied(void);
 static void CashlessStateVendRequest(void);
 static bool CashlessIsSessionTimeout(void);
 static void CashlessStateSessionComplete(void);
+static bool CashlessIsReset(void);
+static void CashlessReset(void);
 
 static void MdbOsUpdateNonRespTime(uint8_t time);
-static void CashlessReset(void);
 
 static void MdbBufSend(const uint16_t *pucBuffer, uint8_t len);
 
@@ -176,6 +179,10 @@ void CashlessInit(void)
     xTResponseTimer = xTimerCreate ( "TRespTimer", MDB_T_RESPONSE_TIMEOUT + 3, pdFALSE, ( void * ) 0, vTimerTRespCb );
     xSessionIdleTimer = xTimerCreate ( "SesTimeout", 30 * 1000, pdFALSE, ( void * ) 0, vTimerSessionTimeoutCb );
 
+    mdv_dev_init_struct_t mdb_dev_struct;
+    mdb_dev_struct.send_callback = MdbBufSend;
+    MdbInit(mdb_dev_struct);
+
     CashlessReset();
 
     MdbUsartInit();
@@ -186,14 +193,14 @@ void CashlessInit(void)
 
 static void CashlessReset(void)
 {
-    mdv_dev_init_struct_t mdb_dev_struct;
 
     cashless_dev.isForceEnable    = false;
     cashless_dev.isForceDisable   = false;
-    cashless_dev.isEnable         = false;
+    cashless_dev.isEnable         = true;
     cashless_dev.isChange         = false;
     cashless_dev.isVendRequest    = false;
     cashless_dev.isSessiontimeout = false;
+    cashless_dev.isReset          = false;
     cashless_dev.vendStat       = CL_VEND_WAIT;
 
     mdb_count_non_resp = MDB_COUNT_NON_RESP;
@@ -201,8 +208,6 @@ static void CashlessReset(void)
     curAct = CL_ACT_JST_RST_E;
     curState = CL_ST_RESET_E;
 
-    mdb_dev_struct.send_callback = MdbBufSend;
-    MdbInit(mdb_dev_struct);
 
     xTimerStop(xNonResponseTimer, 0);
     xTimerStop(xTResponseTimer, 0);
@@ -253,6 +258,7 @@ void vTaskCLRx(void *pvParameters)
                     xSemaphoreGive(cl_ack_sem);
                     break;
                 case MDB_RET_VEND_APPROVED:
+                    action = CL_ACT_VEND_APRV;
                     xSemaphoreGive(cl_ack_sem);
                     break;
                 case MDB_RET_VEND_DENIED:
@@ -337,6 +343,11 @@ void vTaskCLTx(void *pvParameters)
         if (CashlessIsSessionTimeout())
         {
             curState = CL_ST_SES_CMPL;
+        }
+
+        if(CashlessIsReset())
+        {
+            curState = CL_ST_RESET_E;
         }
 
         switch(curState)
@@ -501,7 +512,13 @@ static bool CashlessIsSessionTimeout(void)
 
 static void CashlessStateVendApproved(void)
 {
+    uint8_t buf[2];
     cashless_dev.vendStat = CL_VEND_APPROVED;
+
+    buf[0] = (cashless_dev.item >> 8) & 0xFF;
+    buf[1] = cashless_dev.item & 0xFF;
+
+    MdbSendCommand(MDB_VEND_CMD_E, MDB_VEND_SUCCESS_SUBCMD, buf);
 }
 
 static void CashlessStateVendDenied(void)
@@ -517,6 +534,9 @@ void CashlessShowState(uint8_t *state1, uint8_t *state2)
 
 void CashlessEnable(void)
 {
+    if (MdbGetMachineState() != MDB_STATE_DISABLED)
+        return;
+
     if (!cashless_dev.isForceDisable)
     {
         if (!cashless_dev.isEnable)
@@ -529,6 +549,9 @@ void CashlessEnable(void)
 
 void CashlessDisable(void)
 {
+    if (MdbGetMachineState() != MDB_STATE_ENABLED)
+        return;
+
     if (!cashless_dev.isForceEnable)
     {
         if (cashless_dev.isEnable)
@@ -539,7 +562,7 @@ void CashlessDisable(void)
     }
 }
 
-void CashlessEnableForce(bool enable)
+void CashlessEnableForceCmd(bool enable)
 {
     if (enable)
     {
@@ -560,7 +583,7 @@ void CashlessEnableForce(bool enable)
     }
 }
 
-void CashlessDisableForce(bool disable)
+void CashlessDisableForceCmd(bool disable)
 {
     if (disable)
     {
@@ -603,11 +626,31 @@ static bool CashlessIsEnable(void)
     return cashless_dev.isEnable;
 }
 
-void CashlessVendRequest(uint16_t price, uint16_t item)
+void CashlessResetCmd(void)
 {
+    cashless_dev.isReset = true;
+}
+
+static bool CashlessIsReset(void)
+{
+    if (cashless_dev.isReset)
+    {
+        cashless_dev.isReset = false;
+        return true;
+    }
+
+    return false;
+}
+
+uint8_t CashlessVendRequest(uint16_t price, uint16_t item)
+{
+    if (MdbGetMachineState() != MDB_STATE_SESSION_IDLE)
+        return 1;
+
     cashless_dev.price = price;
     cashless_dev.item  = item;
     cashless_dev.isVendRequest = true;
+    return 0;
 }
 
 /* =======================================*/
