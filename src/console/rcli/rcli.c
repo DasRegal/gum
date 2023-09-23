@@ -323,11 +323,20 @@ char cctalk_func_cmd(unsigned char args, void* argv)
 char cashless_func_cmd(unsigned char args, void* argv)
 {
     char * help_str = 
-"Usage: cashless [enable|disable] [on|off]\r\n\r\n";
+"Usage: cashless <command>\r\n\r\n";
+    char * help_str1 = 
+"enable on|off\t\tForce enable On\\Off\r\n\
+disable on|off\t\tForce disable On\\Off\r\n";
+    char * help_str2 = 
+"show state\t\tShow internal state of Cashless\r\n\r\n";
 
     if (args == 1)
     {
         sprintf(rcli_out_buf, "%s", help_str);
+        RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+        sprintf(rcli_out_buf, "%s", help_str1);
+        RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+        sprintf(rcli_out_buf, "%s", help_str2);
         RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
         return 0;
     }
@@ -341,6 +350,10 @@ char cashless_func_cmd(unsigned char args, void* argv)
             strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "?") == 0)
         {
             sprintf(rcli_out_buf, "%s", help_str);
+            RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+            sprintf(rcli_out_buf, "%s", help_str1);
+            RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+            sprintf(rcli_out_buf, "%s", help_str2);
             RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
             return 0;
         }
@@ -385,10 +398,38 @@ char cashless_func_cmd(unsigned char args, void* argv)
         {
             if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 2, "state") == 0)
             {
-                uint8_t state;
-                CashlessShowState(&state);
+                uint8_t state1, state2;
+                char str[14];
+                CashlessShowState(&state1, &state2);
 
-                sprintf(rcli_out_buf, "Cashless State Machin: %d\r\n", state);
+                switch(state2)
+                {
+                    case MDB_STATE_INACTIVE:
+                        sprintf(str, "Inactive");
+                        break;
+                    case MDB_STATE_DISABLED:
+                        sprintf(str, "Disabled");
+                        break;
+                     case MDB_STATE_ENABLED:
+                        sprintf(str, "Enabled");
+                        break;
+                     case MDB_STATE_SESSION_IDLE:
+                        sprintf(str, "Session Idle");
+                        break;
+                     case MDB_STATE_VEND:
+                        sprintf(str, "Vend");
+                        break;
+                     case MDB_STATE_REVALUE:
+                        sprintf(str, "Revalue");
+                        break;
+                     case MDB_STATE_NEG_VEND:
+                        sprintf(str, "Neg Vend");
+                        break;
+                    default:
+                        sprintf(str, "Unknown");
+                        break;
+                }
+                sprintf(rcli_out_buf, "Cashless State Machin: %s\r\nHelper state: %d\r\n", str, state1);
                 RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
                 return 0;
             }

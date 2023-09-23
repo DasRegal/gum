@@ -489,26 +489,25 @@ static mdb_ret_resp_t MdbParseData(uint8_t len)
         switch(mdb_dev.rx_data[0] & 0xFF)
         {
             case MDB_ACK:
-                ret = MDB_RET_IDLE;
 
-                // if(mdb_dev.send_cmd == MDB_VEND_CMD_E)
-                // {
-                //     switch(mdb_dev.sub_cmd)
-                //     {
-                //         case MDB_VEND_REQ_SUBCMD:
-                //             mdb_dev.state = MDB_STATE_VEND;
-                //             break;
-                //         case MDB_VEND_SUCCESS_SUBCMD:
-                //         case MDB_VEND_CANCEL_SUBCMD:
-                //             mdb_dev.state = MDB_STATE_SESSION_IDLE;
-                //             break;
-                //         case MDB_VEND_NEG_REQ_SUBCMD:
-                //             mdb_dev.state = MDB_STATE_NEG_VEND;
-                //             break;
-                //         default:
-                //             break;
-                //     }
-                // }
+                if(mdb_dev.send_cmd == MDB_VEND_CMD_E)
+                {
+                    switch(mdb_dev.send_subcmd)
+                    {
+                        case MDB_VEND_REQ_SUBCMD:
+                            mdb_dev.state = MDB_STATE_VEND;
+                            break;
+                        case MDB_VEND_SUCCESS_SUBCMD:
+                        case MDB_VEND_CANCEL_SUBCMD:
+                            mdb_dev.state = MDB_STATE_SESSION_IDLE;
+                            break;
+                        case MDB_VEND_NEG_REQ_SUBCMD:
+                            mdb_dev.state = MDB_STATE_NEG_VEND;
+                            break;
+                        default:
+                            break;
+                    }
+                }
 
                 if(mdb_dev.send_cmd == MDB_RESET_CMD_E)
                     mdb_dev.state = MDB_STATE_INACTIVE;
@@ -581,7 +580,6 @@ static mdb_ret_resp_t MdbParseResponse(void)
                 }
 
                 return MDB_RET_CONFIG;
-                return MDB_RET_OK_DATA;
             }
         /* Not resp, only POLL */
         case MDB_POLL_DISPLAY_REQ_RESP:
@@ -594,15 +592,11 @@ static mdb_ret_resp_t MdbParseResponse(void)
                 // TODO Проверить что приходит
                 // MdbSelectItem();
                 return MDB_RET_BEGIN_SESSION;
-                return MDB_RET_OK_DATA;
-                // break;
             }
         /* Not resp, only POLL p134 */
         case MDB_POLL_SESS_CANCEL_RESP:
             {
                 return MDB_RET_SESS_CANCEL;
-                // MdbSessionCancel();
-                // break;
             }
         /* Resp & POLL */
         case MDB_POLL_VEND_APPROVED_RESP:
@@ -622,6 +616,7 @@ static mdb_ret_resp_t MdbParseResponse(void)
                 mdb_dev.state = MDB_STATE_ENABLED;
                 //TODO
                 // Check max non-response time!
+                return MDB_RET_END_SESSION;
                 break;
             }
         /* Resp & POLL */
