@@ -118,19 +118,6 @@ static mdb_ret_resp_t MdbParseData(uint8_t len);
 static mdb_ret_resp_t MdbParseResponse(void);
 static void MdbSelectItem(void);
 static void MdbSessionCancel(void);
-static void MdbVendDenied(void);
-static void MdbUpdateNonRespTime(uint8_t time);
-
-typedef enum
-{
-    MDB_STATE_INACTIVE = 1,
-    MDB_STATE_DISABLED,     /* CMD_READER_ENABLE->STATE_ENABLE, CMD_RESET->STATE_INACTIVE*/
-    MDB_STATE_ENABLED,      /* CMD_READER_DISABLE->STATE_DISABLE, CMD_RESET->STATE_INACTIVE */
-    MDB_STATE_SESSION_IDLE, /* payment event->STATE_SESS_IDLE. CMD_SESSION_COMPLETE->?, CMD_VEND_REQUEST->STATE_VEND, CMD_REVALUE_REQUEST->STATE_REVALUE, CMD_NEG_VEND_REQUEST->STATE_NEG_VEND */
-    MDB_STATE_VEND,
-    MDB_STATE_REVALUE,      /* Level 2/3 */
-    MDB_STATE_NEG_VEND      /* Level 3 */
-} mdb_state_t;
 
 typedef struct
 {
@@ -291,7 +278,6 @@ typedef struct
     void            (*send_callback)(const uint16_t*, uint8_t);
     void            (*select_item_cb)(void);
     void            (*session_cancel_cb)(void);
-    void            (*update_resp_time_cb)(uint8_t);
     mdb_dev_slave_t dev_slave;
     mdb_state_t     state;
 } mdb_dev_t;
@@ -305,7 +291,6 @@ void MdbInit(mdv_dev_init_struct_t dev_struct)
     mdb_dev.send_callback   = dev_struct.send_callback;
     mdb_dev.select_item_cb  = dev_struct.select_item_cb;
     mdb_dev.session_cancel_cb = dev_struct.session_cancel_cb;
-    mdb_dev.update_resp_time_cb = dev_struct.update_resp_time_cb;
     mdb_dev.rx_len          = 0;
     mdb_dev.level           = MDB_LEVEL_2;
     mdb_dev.state           = MDB_STATE_INACTIVE;
@@ -334,6 +319,9 @@ void MdbSendCommand(uint8_t cmd, uint8_t subcmd, uint8_t * data)
     uint8_t size = 0;
     uint8_t lvl_type = 0;
     uint8_t lvl_support = 0;
+
+    mdb_dev.send_cmd    = cmd;
+    mdb_dev.send_subcmd = subcmd;
 
     mdb_dev.tx_data[0] = cmd + mdb_dev.addr + MDB_MODE_BIT;
 
@@ -502,12 +490,38 @@ static mdb_ret_resp_t MdbParseData(uint8_t len)
         {
             case MDB_ACK:
                 ret = MDB_RET_IDLE;
+
+                // if(mdb_dev.send_cmd == MDB_VEND_CMD_E)
+                // {
+                //     switch(mdb_dev.sub_cmd)
+                //     {
+                //         case MDB_VEND_REQ_SUBCMD:
+                //             mdb_dev.state = MDB_STATE_VEND;
+                //             break;
+                //         case MDB_VEND_SUCCESS_SUBCMD:
+                //         case MDB_VEND_CANCEL_SUBCMD:
+                //             mdb_dev.state = MDB_STATE_SESSION_IDLE;
+                //             break;
+                //         case MDB_VEND_NEG_REQ_SUBCMD:
+                //             mdb_dev.state = MDB_STATE_NEG_VEND;
+                //             break;
+                //         default:
+                //             break;
+                //     }
+                // }
+
+                if(mdb_dev.send_cmd == MDB_RESET_CMD_E)
+                    mdb_dev.state = MDB_STATE_INACTIVE;
+
+                ret = MDB_RET_ACK;
                 break;
             case MDB_NAK:
                 ret = MDB_RET_IDLE;
+                ret = MDB_RET_NACK;
                 break;
             default:
                 ret = MDB_RET_IDLE;
+                ret = MDB_RET_NACK;
         }
         return ret;
     }
@@ -533,6 +547,7 @@ static mdb_ret_resp_t MdbParseResponse(void)
         case MDB_POLL_JUST_RESET_RESP:
             {
                 mdb_dev.state = MDB_STATE_INACTIVE;
+                return MDB_RET_JUST_RESET;
                 return MDB_RET_OK_DATA;
             }
         /* Resp & POLL */
@@ -541,7 +556,7 @@ static mdb_ret_resp_t MdbParseResponse(void)
                 mdb_dev.state = MDB_STATE_DISABLED;
 
                 mdb_dev.dev_slave.country_code = (mdb_dev.rx_data[2] << 8) + mdb_dev.rx_data[3];
-                if (mdb_dev.dev_slave.country_code != MDB_CURRENCY_CODE_RUB_1 ||
+                if (mdb_dev.dev_slave.country_code != MDB_CURRENCY_CODE_RUB_1 &&
                     mdb_dev.dev_slave.country_code != MDB_CURRENCY_CODE_RUB_2)
                 {
                     return MDB_RET_ERROR_CURRENCY_CODE;
@@ -552,21 +567,21 @@ static mdb_ret_resp_t MdbParseResponse(void)
                 mdb_dev.dev_slave.decimal_places    = mdb_dev.rx_data[5];
                 mdb_dev.dev_slave.misc              = mdb_dev.rx_data[7];
 
-                if (mdb_dev.level > mdb_dev.dev_slave.level)
-                {
-                    mdb_dev.level = mdb_dev.dev_slave.level;
-                    mdb_dev.dev_slave.max_resp_time = mdb_dev.rx_data[6];
-                    return MDB_RET_UPDATE_LEVEL;
-                }
+                // if (mdb_dev.level > mdb_dev.dev_slave.level)
+                // {
+                //     mdb_dev.level = mdb_dev.dev_slave.level;
+                //     mdb_dev.dev_slave.max_resp_time = mdb_dev.rx_data[6];
+                //     return MDB_RET_UPDATE_LEVEL;
+                // }
 
                 if (mdb_dev.dev_slave.max_resp_time != mdb_dev.rx_data[6])
                 {
                     mdb_dev.dev_slave.max_resp_time = mdb_dev.rx_data[6];
-                    return MDB_RET_UPDATE_RESPONSE_TIME;
+                    // return MDB_RET_UPDATE_RESPONSE_TIME;
                 }
 
+                return MDB_RET_CONFIG;
                 return MDB_RET_OK_DATA;
-                // MdbUpdateNonRespTime(mdb_dev.dev_slave.max_resp_time);
             }
         /* Not resp, only POLL */
         case MDB_POLL_DISPLAY_REQ_RESP:
@@ -578,6 +593,7 @@ static mdb_ret_resp_t MdbParseResponse(void)
                 mdb_dev.state = MDB_STATE_SESSION_IDLE;
                 // TODO Проверить что приходит
                 // MdbSelectItem();
+                return MDB_RET_BEGIN_SESSION;
                 return MDB_RET_OK_DATA;
                 // break;
             }
@@ -596,6 +612,8 @@ static mdb_ret_resp_t MdbParseResponse(void)
         /* Resp & POLL */
         case MDB_POLL_VEND_DENIED_RESP:
             {
+                /*  Do not dispense any products */
+                mdb_dev.state = MDB_STATE_SESSION_IDLE;
                 return MDB_RET_VEND_DENIED;
             }
         /* Resp & POLL */
@@ -621,6 +639,7 @@ static mdb_ret_resp_t MdbParseResponse(void)
                 for (uint8_t i = 0; i < 12; i++)
                     mdb_dev.dev_slave.model_num[i] = mdb_dev.rx_data[i + 1 + 3 + 12];
                 mdb_dev.dev_slave.sw_version = (mdb_dev.rx_data[28] << 8) + mdb_dev.rx_data[29];
+                return MDB_RET_PERIPH_ID;
                 break;
             }
         /* Not resp, only POLL */
@@ -649,6 +668,7 @@ static mdb_ret_resp_t MdbParseResponse(void)
         /* Not resp, only POLL */
         case MDB_POLL_OUT_OF_SEQ_RESP:
             {
+                mdb_dev.state = MDB_STATE_SESSION_IDLE;
                 switch(mdb_dev.rx_data[1])
                 {
                     case MDB_STATE_INACTIVE:
@@ -711,6 +731,11 @@ mdb_level_t MdbGetLevel(void)
     return mdb_dev.level;
 }
 
+uint8_t MdbGetNonRespTime(void)
+{
+    return mdb_dev.dev_slave.max_resp_time;
+}
+
 void MdbSetLevel(mdb_level_t level)
 {
     mdb_dev.level = level;
@@ -721,12 +746,9 @@ void MdbSetExpansion(bool is_exp)
     mdb_dev.is_expansion_en = is_exp;
 }
 
-static void MdbUpdateNonRespTime(uint8_t time)
+mdb_state_t MdbGetMachineState(void)
 {
-    if (mdb_dev.update_resp_time_cb == NULL)
-        return;
-
-    mdb_dev.update_resp_time_cb(time);
+    return mdb_dev.state;
 }
 
 #ifndef TEST_MDB

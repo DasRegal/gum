@@ -70,7 +70,14 @@ typedef enum
     MDB_RET_VEND_DENIED,
     MDB_RET_REVALUE_APPROVED,
     MDB_RET_REVALUE_DENIED,
-    MDB_RET_SESS_CANCEL
+
+    MDB_RET_ACK,
+    MDB_RET_NACK,
+    MDB_RET_JUST_RESET,
+    MDB_RET_CONFIG,
+    MDB_RET_PERIPH_ID,
+    MDB_RET_BEGIN_SESSION,
+    MDB_RET_SESS_CANCEL,
 } mdb_ret_resp_t;
 
 typedef enum
@@ -84,12 +91,22 @@ typedef enum
     MDB_EXPANSION_CMD_E = 7
 } mdb_code_cmd_t;
 
+typedef enum
+{
+    MDB_STATE_INACTIVE = 1,
+    MDB_STATE_DISABLED,     /* CMD_READER_ENABLE->STATE_ENABLE, CMD_RESET->STATE_INACTIVE*/
+    MDB_STATE_ENABLED,      /* CMD_READER_DISABLE->STATE_DISABLE, CMD_RESET->STATE_INACTIVE */
+    MDB_STATE_SESSION_IDLE, /* payment event->STATE_SESS_IDLE. CMD_SESSION_COMPLETE->?, CMD_VEND_REQUEST->STATE_VEND, CMD_REVALUE_REQUEST->STATE_REVALUE, CMD_NEG_VEND_REQUEST->STATE_NEG_VEND */
+    MDB_STATE_VEND,         /* After ACK on VEND REQUEST */
+    MDB_STATE_REVALUE,      /* Level 2/3 */
+    MDB_STATE_NEG_VEND      /* Level 3 */
+} mdb_state_t;
+
 typedef struct
 {
     void            (*send_callback)(const uint16_t*, uint8_t);
     void            (*select_item_cb)(void);
     void            (*session_cancel_cb)(void);
-    void            (*update_resp_time_cb)(uint8_t);
 } mdv_dev_init_struct_t;
 //void MdbPrint(void);
 //void MdbBufSend(const uint16_t *pucBuffer, uint8_t len);
@@ -105,5 +122,6 @@ void MdbUsartInit(void);
 uint16_t MdbGetRxCh(uint8_t idx);
 // void MdbClearRx(uint8_t idx);
 mdb_ret_resp_t MdbReceiveChar(uint16_t ch);
+mdb_state_t MdbGetMachineState(void);
 
 #endif /* _MDB_H */

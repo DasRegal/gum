@@ -64,7 +64,7 @@ SRCS = 	./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
 	./src/hw_adc.c \
 	./src/hw_voltage_adc/hw_voltage_adc.c \
 	./src/mdb/mdb.c \
-	./src/mdb/mdb_os.c \
+	./src/mdb/cashless.c \
 	./src/cctalk/cctalk.c \
 	./src/cctalk/coinbox.c \
 	./main.c

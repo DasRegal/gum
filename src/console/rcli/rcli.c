@@ -2,12 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "main.h"
 #include "version.h"
 #include "buf.h"
 #include "mdb.h"
 #include "coinbox.h"
+#include "cashless.h"
 
 extern void UsartDebugSendString(const char *pucBuffer);
 
@@ -168,6 +170,7 @@ char help_func_cmd(unsigned char args, void* argv);
 char console_func_cmd(unsigned char args, void* argv);
 char mdb_func_cmd(unsigned char args, void* argv);
 char cctalk_func_cmd(unsigned char args, void* argv);
+char cashless_func_cmd(unsigned char args, void* argv);
 
 typedef char (*cb_t)(unsigned char args, void* argv);
 typedef struct
@@ -179,6 +182,7 @@ typedef struct
 
 rcli_cmd_t rcli_commands[] = 
 {
+    { 1, (char*[]){ "cashless", NULL }, cashless_func_cmd },
     { 1, (char*[]){ "cctalk", NULL }, cctalk_func_cmd },
     { 3, (char*[]){ "cmd", "ddd", "q", NULL }, cmd_func_cmd },
     { 1, (char*[]){ "console", NULL}, console_func_cmd },
@@ -314,6 +318,86 @@ char cctalk_func_cmd(unsigned char args, void* argv)
 
     CctalkSendData(data);
     return 0;
+}
+
+char cashless_func_cmd(unsigned char args, void* argv)
+{
+    char * help_str = 
+"Usage: cashless [enable|disable] [on|off]\r\n\r\n";
+
+    if (args == 1)
+    {
+        sprintf(rcli_out_buf, "%s", help_str);
+        RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+        return 0;
+    }
+
+    if (args == 2)
+    {
+        if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "help") == 0 ||
+            strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "enable") == 0 ||
+            strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "disable") == 0 ||
+            strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "show") == 0 ||
+            strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "?") == 0)
+        {
+            sprintf(rcli_out_buf, "%s", help_str);
+            RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+            return 0;
+        }
+        return 0;
+    }
+
+    if (args == 3)
+    {
+        if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "enable") == 0)
+        {
+            if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 2, "on") == 0)
+            {
+                CashlessEnableForce(true);
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+                return 0;
+            }
+            if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 2, "off") == 0)
+            {
+                CashlessEnableForce(false);
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+                return 0;
+            }
+        }
+
+        if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "disable") == 0)
+        {
+            if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 2, "on") == 0)
+            {
+                CashlessDisableForce(true);
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+                return 0;
+            }
+            if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 2, "off") == 0)
+            {
+                CashlessDisableForce(false);
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+                return 0;
+            }
+        }
+
+        if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "show") == 0)
+        {
+            if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 2, "state") == 0)
+            {
+                uint8_t state;
+                CashlessShowState(&state);
+
+                sprintf(rcli_out_buf, "Cashless State Machin: %d\r\n", state);
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+                return 0;
+            }
+        }
+    }
+
+    sprintf(rcli_out_buf, "Bad params\r\n");
+    RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+    return -1;
 }
 
 char rcli_parse_cmd(ctrlBuf_s bufStruct)
