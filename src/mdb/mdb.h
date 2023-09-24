@@ -124,5 +124,6 @@ uint16_t MdbGetRxCh(uint8_t idx);
 // void MdbClearRx(uint8_t idx);
 mdb_ret_resp_t MdbReceiveChar(uint16_t ch);
 mdb_state_t MdbGetMachineState(void);
+uint16_t MdbGetApprovedAmount(void);
 
 #endif /* _MDB_H */

@@ -330,7 +330,9 @@ disable on|off\t\tForce disable On\\Off\r\n";
     char * help_str2 = 
 "show state\t\tShow internal state of Cashless\r\n";
     char * help_str3 = 
-"vend <price> <item>\tPush Vend request\r\n\r\n";
+"vend <price> <item>\tPush Vend request\r\n";
+    char * help_str4 = 
+"vend ok|fail\t\tIs dispensed\r\n";
 
     if (args == 1)
     {
@@ -341,6 +343,8 @@ disable on|off\t\tForce disable On\\Off\r\n";
         sprintf(rcli_out_buf, "%s", help_str2);
         RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
         sprintf(rcli_out_buf, "%s", help_str3);
+        RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+        sprintf(rcli_out_buf, "%s", help_str4);
         RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
         return 0;
     }
@@ -373,6 +377,8 @@ disable on|off\t\tForce disable On\\Off\r\n";
         if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "vend") == 0)
         {
             sprintf(rcli_out_buf, "\r\n%s", help_str3);
+            RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+            sprintf(rcli_out_buf, "\r\n%s", help_str4);
             RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
         }
 
@@ -458,6 +464,26 @@ disable on|off\t\tForce disable On\\Off\r\n";
                 RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
                 return 0;
             }
+        }
+
+        if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "vend") == 0)
+        {
+            if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 2, "ok") == 0)
+            {
+                CashlessVendSuccessCmd(0);
+                sprintf(rcli_out_buf, "The selected product has been successfully dispensed.\r\n");
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+                return 0;
+            }
+
+            if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 2, "fail") == 0)
+            {
+                CashlessVendFailureCmd();
+                sprintf(rcli_out_buf, "The product was not dispensed.\r\n");
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+                return 0;
+            }
+
         }
     }
 

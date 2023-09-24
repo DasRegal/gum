@@ -280,6 +280,7 @@ typedef struct
     void            (*session_cancel_cb)(void);
     mdb_dev_slave_t dev_slave;
     mdb_state_t     state;
+    uint16_t        amount;
 } mdb_dev_t;
 
 static mdb_dev_t mdb_dev;
@@ -495,7 +496,8 @@ static mdb_ret_resp_t MdbParseData(uint8_t len)
                     switch(mdb_dev.send_subcmd)
                     {
                         case MDB_VEND_REQ_SUBCMD:
-                            mdb_dev.state = MDB_STATE_VEND;
+                            mdb_dev.state  = MDB_STATE_VEND;
+                            mdb_dev.amount = 0;
                             break;
                         case MDB_VEND_SUCCESS_SUBCMD:
                         case MDB_VEND_CANCEL_SUBCMD:
@@ -610,6 +612,7 @@ static mdb_ret_resp_t MdbParseResponse(void)
         /* Resp & POLL */
         case MDB_POLL_VEND_APPROVED_RESP:
             {
+                mdb_dev.amount = mdb_dev.rx_data[1] << 8 + mdb_dev.rx_data[2];
                 return MDB_RET_VEND_APPROVED;
             }
         /* Resp & POLL */
@@ -753,6 +756,11 @@ void MdbSetExpansion(bool is_exp)
 mdb_state_t MdbGetMachineState(void)
 {
     return mdb_dev.state;
+}
+
+uint16_t MdbGetApprovedAmount(void)
+{
+    return mdb_dev.amount;
 }
 
 #ifndef TEST_MDB
