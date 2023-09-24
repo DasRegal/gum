@@ -251,38 +251,6 @@ mdb_cmd_t mdb_cmd[8] =
     { MDB_EXPANSION_CMD_E, expansion_sub_cmd, expansion_response },
 };
 
-typedef struct
-{
-    mdb_level_t     level;
-    uint16_t        country_code;
-    uint8_t         scale_factor;
-    uint8_t         decimal_places;
-    uint8_t         max_resp_time;
-    uint8_t         misc;
-    uint8_t         manufact_code[3];
-    uint8_t         serial_num[12];
-    uint8_t         model_num[12];
-    uint16_t        sw_version;
-} mdb_dev_slave_t;
-
-typedef struct
-{
-    uint8_t         addr;
-    mdb_level_t     level;
-    bool            is_expansion_en;
-    uint16_t        rx_data[MDB_MAX_BUF_LEN];
-    uint8_t         rx_len;
-    uint16_t        tx_data[MDB_MAX_BUF_LEN];
-    uint8_t         send_cmd;
-    uint8_t         send_subcmd;
-    void            (*send_callback)(const uint16_t*, uint8_t);
-    void            (*select_item_cb)(void);
-    void            (*session_cancel_cb)(void);
-    mdb_dev_slave_t dev_slave;
-    mdb_state_t     state;
-    uint16_t        amount;
-} mdb_dev_t;
-
 static mdb_dev_t mdb_dev;
 
 
@@ -612,7 +580,7 @@ static mdb_ret_resp_t MdbParseResponse(void)
         /* Resp & POLL */
         case MDB_POLL_VEND_APPROVED_RESP:
             {
-                mdb_dev.amount = mdb_dev.rx_data[1] << 8 + mdb_dev.rx_data[2];
+                mdb_dev.amount = (mdb_dev.rx_data[1] << 8) | mdb_dev.rx_data[2];
                 return MDB_RET_VEND_APPROVED;
             }
         /* Resp & POLL */
@@ -762,6 +730,12 @@ uint16_t MdbGetApprovedAmount(void)
 {
     return mdb_dev.amount;
 }
+
+mdb_dev_t MdbGetDev(void)
+{
+    return mdb_dev;
+}
+
 
 #ifndef TEST_MDB
 void MdbUsartInit(void)

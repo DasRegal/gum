@@ -328,7 +328,8 @@ char cashless_func_cmd(unsigned char args, void* argv)
 "enable on|off\t\tForce enable On\\Off\r\n\
 disable on|off\t\tForce disable On\\Off\r\n";
     char * help_str2 = 
-"show state\t\tShow internal state of Cashless\r\n";
+"show state\t\tShow internal state of Cashless\r\n\
+show info\t\tShow Information\r\n";
     char * help_str3 = 
 "vend <price> <item>\tPush Vend request\r\n";
     char * help_str4 = 
@@ -429,9 +430,9 @@ disable on|off\t\tForce disable On\\Off\r\n";
         {
             if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 2, "state") == 0)
             {
-                uint8_t state1, state2;
+                uint8_t state1, state2, state3;
                 char str[14];
-                CashlessShowState(&state1, &state2);
+                CashlessShowState(&state1, &state2, &state3);
 
                 switch(state2)
                 {
@@ -460,8 +461,47 @@ disable on|off\t\tForce disable On\\Off\r\n";
                         sprintf(str, "Unknown");
                         break;
                 }
-                sprintf(rcli_out_buf, "Cashless State Machin: %s\r\nHelper state: %d\r\n", str, state1);
+                sprintf(rcli_out_buf, "Cashless State Machin: %s\r\nHelper state: %d\r\nHelper action: %d\r\n", str, state1, state3);
                 RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+                return 0;
+            }
+
+            if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 2, "info") == 0)
+            {
+                mdb_dev_t mdb_dev;
+
+                mdb_dev = MdbGetDev();
+
+                sprintf(rcli_out_buf, "Serial Number: %s\r\n", mdb_dev.dev_slave.serial_num);
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+
+                sprintf(rcli_out_buf, "Model Number: %s\r\n", mdb_dev.dev_slave.model_num);
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+
+                sprintf(rcli_out_buf, "Manufacture Code: %s\r\n", mdb_dev.dev_slave.manufact_code);
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+
+                sprintf(rcli_out_buf, "SW Version: %d\r\n", mdb_dev.dev_slave.sw_version);
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+
+                sprintf(rcli_out_buf, "Cashless MDB Level: %d. Master MDB Level: %d\r\n", mdb_dev.dev_slave.level, mdb_dev.level);
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+
+                sprintf(rcli_out_buf, "Country Code: %d\r\n", mdb_dev.dev_slave.country_code);
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+
+                sprintf(rcli_out_buf, "Scale Factor: %d\r\n", mdb_dev.dev_slave.scale_factor);
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+
+                sprintf(rcli_out_buf, "Decimal Place: %d\r\n", mdb_dev.dev_slave.decimal_places);
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+
+                sprintf(rcli_out_buf, "Max Resp Time: %d\r\n", mdb_dev.dev_slave.max_resp_time);
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+
+                sprintf(rcli_out_buf, "Misc: %d\r\n", mdb_dev.dev_slave.misc);
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+
                 return 0;
             }
         }
@@ -470,8 +510,11 @@ disable on|off\t\tForce disable On\\Off\r\n";
         {
             if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 2, "ok") == 0)
             {
-                CashlessVendSuccessCmd(0);
-                sprintf(rcli_out_buf, "The selected product has been successfully dispensed.\r\n");
+                if (CashlessVendSuccessCmd(0) != 0)
+                    sprintf(rcli_out_buf, "Оплата не прошла.\r\n");
+                else
+                    sprintf(rcli_out_buf, "The selected product has been successfully dispensed.\r\n");
+
                 RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
                 return 0;
             }

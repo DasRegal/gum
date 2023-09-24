@@ -71,8 +71,8 @@ typedef enum
     CL_ST_DISABLE_E,        /* 14 00H DISABLE */
     CL_ST_VEND_REQ,         /* 13 00H VEND REQUEST */
     CL_ST_SES_CMPL,         /* 13 04H SESSION COMPLETE */
-    CL_ST_VND_APPR,
-    CL_ST_VND_DEN,
+    // CL_ST_VND_APPR,
+    // CL_ST_VND_DEN,
     CL_ST_VND_SUCC,         /* 13 02H VEND SUCCESS */
     CL_ST_VND_FAIL,         /* 13 03H VEND FAILURE */
     CL_ST_VND_CAN,          /* 13 01H VEND CANCEL */
@@ -97,7 +97,7 @@ cashless_state_t cashless_machine_state[CL_ST_LAST_E][CL_ACT_LAST_E] =
     /* 00 JUST RESET        01 CONFIG           09 PERIPH ID        03 BEGIN SESSION        04 CANCEL SESSION       05 VEND APPROVED        06 VEND DENIED         07 END SESSION          ACK                     NACK         */
     /* CL_ST_RESET_E        CL_ACT_CFG_E        CL_ACT_P_ID_E       CL_ACT_SES_BEG_E        CL_ACT_SES_CNCL_E       CL_ACT_VEND_APRV        CL_ACT_VEND_DEN_E                              CL_ACT_ACK_E            CL_ACT_NACK_E*/
     { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_RESET_E          }, /* CL_ST_RESET_E          10H RESET */
-    { CL_ST_SETUP_CONF_E,   CL_ST_PRICES_E,     CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_SES_CMPL,         CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E           }, /* CL_ST_POLL_E           12H POLL */
+    { CL_ST_SETUP_CONF_E,   CL_ST_PRICES_E,     CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_SES_CMPL,         CL_ST_POLL_E,           CL_ST_SES_CMPL,        CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E           }, /* CL_ST_POLL_E           12H POLL */
     { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_SETUP_CONF_E     }, /* CL_ST_SETUP_CONF_E     11 00H SETUP CONF */
     { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_RESET_E,          CL_ST_EXP_REQUEST_ID_E, CL_ST_PRICES_E         }, /* CL_ST_PRICES_E         11 01H SETUP PRICES */
     { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_ENABLE_E,     CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_EXP_REQUEST_ID_E }, /* CL_ST_EXP_REQUEST_ID_E 17 00H EXP REQUEST ID */
@@ -105,10 +105,10 @@ cashless_state_t cashless_machine_state[CL_ST_LAST_E][CL_ACT_LAST_E] =
     { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_EXP_PRICE_E      }, /* CL_ST_EXP_PRICE_E      11 01H SETUP PRICES */
     { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_ENABLE_E         }, /* CL_ST_ENABLE_E         14 01H ENABLE */
     { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_DISABLE_E        }, /* CL_ST_DISABLE_E        14 00H DISABLE */
-    { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_VND_APPR,         CL_ST_VND_DEN,         CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_VEND_REQ         }, /* CL_ST_VEND_REQ         13 00H VEND REQUEST */
+    { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_VEND_REQ         }, /* CL_ST_VEND_REQ         13 00H VEND REQUEST */
     { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_SES_CMPL         }, /* CL_ST_SES_CMPL         13 04H SESSION COMPLETE */
-    { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_VND_APPR         }, /* CL_ST_VND_APPR         SET APPROVED */
-    { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_VND_DEN          }, /* CL_ST_VND_DEN          SET DENIED */
+    // { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_VND_APPR         }, /* CL_ST_VND_APPR         SET APPROVED */
+    // { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_VND_DEN          }, /* CL_ST_VND_DEN          SET DENIED */
     { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_VND_SUCC         }, /* CL_ST_VND_SUCC         13 02H VEND SUCCESS */
     { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_POLL_E,           CL_ST_SES_CMPL,         CL_ST_VND_FAIL         }, /* CL_ST_VND_FAIL         13 03H VEND FAILURE */
     { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_POLL_E,           CL_ST_SES_CMPL,         CL_ST_VND_CAN          }, /* CL_ST_VND_CAN          13 01H VEND CANCEL */
@@ -284,12 +284,13 @@ void vTaskCLRx(void *pvParameters)
                     break;
                 case MDB_RET_VEND_APPROVED:
                     xTimerStop(xCardReadTimer, 0);
-                    action = CL_ACT_VEND_APRV;
+                    CashlessStateVendApproved();
                     xSemaphoreGive(cl_ack_sem);
                     break;
                 case MDB_RET_VEND_DENIED:
                     xTimerStop(xCardReadTimer, 0);
-                    action = CL_ACT_VEND_APRV;
+                    action = CL_ST_SES_CMPL;
+                    CashlessStateVendDenied();
                     xSemaphoreGive(cl_ack_sem);
                     break;
                 case MDB_RET_END_SESSION:
@@ -438,12 +439,12 @@ void vTaskCLTx(void *pvParameters)
             case CL_ST_SES_CMPL:
                 CashlessStateSessionComplete();
                 break;
-            case CL_ST_VND_APPR:
-                CashlessStateVendApproved();
-                break;
-            case CL_ST_VND_DEN:
-                CashlessStateVendDenied();
-                break;
+            // case CL_ST_VND_APPR:
+            //     CashlessStateVendApproved();
+            //     break;
+            // case CL_ST_VND_DEN:
+            //     CashlessStateVendDenied();
+            //     break;
             case CL_ST_VND_SUCC:
                 CashlessStateVendSuccess();
                 break;
@@ -614,20 +615,26 @@ static void CashlessStateVendDenied(void)
     cashless_dev.vendStat = CL_VEND_DENIED;
 }
 
-void CashlessVendSuccessCmd(uint16_t item)
+uint8_t CashlessVendSuccessCmd(uint16_t item)
 {
-    // if (cashless_dev.vendStat == CL_VEND_APPROVED)
-    // {
+    if (cashless_dev.vendStat == CL_VEND_APPROVED)
+    {
         cashless_dev.isVendSuccess = true;
-    // }
+        return 0;
+    }
+
+    return 1;
 }
 
-void CashlessVendFailureCmd(void)
+uint8_t CashlessVendFailureCmd(void)
 {
-    // if (cashless_dev.vendStat == CL_VEND_APPROVED)
-    // {
+    if (cashless_dev.vendStat == CL_VEND_APPROVED)
+    {
         cashless_dev.isVendFailure = true;
-    // }
+        return 0;
+    }
+
+    return 1;
 }
 
 uint8_t CashlessVendCancelCmd(void)
@@ -672,10 +679,11 @@ static bool CashlessIsVendCancel(void)
     return false;
 }
 
-void CashlessShowState(uint8_t *state1, uint8_t *state2)
+void CashlessShowState(uint8_t *state1, uint8_t *state2, uint8_t *state3)
 {
     *state1 = (uint8_t)curState;
     *state2 = (uint8_t)MdbGetMachineState();
+    *state3 = (uint8_t)curAct;
 }
 
 void CashlessEnable(void)

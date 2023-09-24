@@ -53,11 +53,6 @@ typedef enum
     MDB_LEVEL_3,
 } mdb_level_t;
 
-// typedef enum
-// {
-//     MDB_READER_
-// }
-
 typedef enum
 {
     MDB_RET_OK_DATA,
@@ -111,6 +106,39 @@ typedef struct
     void            (*select_item_cb)(void);
     void            (*session_cancel_cb)(void);
 } mdv_dev_init_struct_t;
+
+typedef struct
+{
+    mdb_level_t     level;
+    uint16_t        country_code;
+    uint8_t         scale_factor;
+    uint8_t         decimal_places;
+    uint8_t         max_resp_time;
+    uint8_t         misc;
+    uint8_t         manufact_code[3];
+    uint8_t         serial_num[12];
+    uint8_t         model_num[12];
+    uint16_t        sw_version;
+} mdb_dev_slave_t;
+
+typedef struct
+{
+    uint8_t         addr;
+    mdb_level_t     level;
+    bool            is_expansion_en;
+    uint16_t        rx_data[MDB_MAX_BUF_LEN];
+    uint8_t         rx_len;
+    uint16_t        tx_data[MDB_MAX_BUF_LEN];
+    uint8_t         send_cmd;
+    uint8_t         send_subcmd;
+    void            (*send_callback)(const uint16_t*, uint8_t);
+    void            (*select_item_cb)(void);
+    void            (*session_cancel_cb)(void);
+    mdb_dev_slave_t dev_slave;
+    mdb_state_t     state;
+    uint16_t        amount;
+} mdb_dev_t;
+
 //void MdbPrint(void);
 //void MdbBufSend(const uint16_t *pucBuffer, uint8_t len);
 
@@ -127,5 +155,6 @@ uint16_t MdbGetRxCh(uint8_t idx);
 mdb_ret_resp_t MdbReceiveChar(uint16_t ch);
 mdb_state_t MdbGetMachineState(void);
 uint16_t MdbGetApprovedAmount(void);
+mdb_dev_t MdbGetDev(void);
 
 #endif /* _MDB_H */
