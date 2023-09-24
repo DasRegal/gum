@@ -484,6 +484,15 @@ disable on|off\t\tForce disable On\\Off\r\n";
                 return 0;
             }
 
+            if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 2, "cancel") == 0)
+            {
+                if (CashlessVendCancelCmd() != 0)
+                    sprintf(rcli_out_buf, "Error. No Status Vend.\r\n");
+                sprintf(rcli_out_buf, "Vend Cancel.\r\n");
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+                return 0;
+            }
+
         }
     }
 

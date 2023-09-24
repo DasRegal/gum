@@ -30,10 +30,12 @@ typedef struct
     bool isEnable;
     bool isChange;
     bool isVendRequest;
-    bool isSessiontimeout;
+    bool isProductSelectionTimeout;
+    bool isCardReadTimeout;
     bool isReset;
     bool isVendSuccess;
     bool isVendFailure;
+    bool isVendCancel;
     cashless_vend_stat_t vendStat;
     uint16_t price;
     uint16_t item;
@@ -45,7 +47,7 @@ typedef enum
     CL_ACT_CFG_E,       /* 01H CONFIG */
     CL_ACT_P_ID_E,      /* 09H PERIPH ID */
     CL_ACT_SES_BEG_E,   /* 03H BEGIN SESSION */
-    CL_ACT_SES_CNCL_E,  /* 04H CANCLE SESSION */
+    CL_ACT_SES_CNCL_E,  /* 04H CANCEL SESSION */
     CL_ACT_VEND_APRV,   /* 05H VEND APPROVED */
     CL_ACT_VEND_DEN_E,  /* 06H VEND DENIED */
     CL_ACT_END_SES_E,   /* 07H END SESSION */
@@ -72,7 +74,8 @@ typedef enum
     CL_ST_VND_APPR,
     CL_ST_VND_DEN,
     CL_ST_VND_SUCC,         /* 13 02H VEND SUCCESS */
-    CL_ST_VND_FAIL,         /* 13 02H VEND FAILURE */
+    CL_ST_VND_FAIL,         /* 13 03H VEND FAILURE */
+    CL_ST_VND_CAN,          /* 13 01H VEND CANCEL */
 
     CL_ST_LAST_E
 } cashless_state_t;
@@ -91,7 +94,7 @@ typedef enum
 
 cashless_state_t cashless_machine_state[CL_ST_LAST_E][CL_ACT_LAST_E] = 
 { 
-    /* 00 JUST RESET        01 CONFIG           09 PERIPH ID        03 BEGIN SESSION        04 CANCLE SESSION       05 VEND APPROVED        06 VEND DENIED         07 END SESSION          ACK                     NACK         */
+    /* 00 JUST RESET        01 CONFIG           09 PERIPH ID        03 BEGIN SESSION        04 CANCEL SESSION       05 VEND APPROVED        06 VEND DENIED         07 END SESSION          ACK                     NACK         */
     /* CL_ST_RESET_E        CL_ACT_CFG_E        CL_ACT_P_ID_E       CL_ACT_SES_BEG_E        CL_ACT_SES_CNCL_E       CL_ACT_VEND_APRV        CL_ACT_VEND_DEN_E                              CL_ACT_ACK_E            CL_ACT_NACK_E*/
     { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_RESET_E          }, /* CL_ST_RESET_E          10H RESET */
     { CL_ST_SETUP_CONF_E,   CL_ST_PRICES_E,     CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_SES_CMPL,         CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E           }, /* CL_ST_POLL_E           12H POLL */
@@ -106,8 +109,9 @@ cashless_state_t cashless_machine_state[CL_ST_LAST_E][CL_ACT_LAST_E] =
     { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_SES_CMPL         }, /* CL_ST_SES_CMPL         13 04H SESSION COMPLETE */
     { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_VND_APPR         }, /* CL_ST_VND_APPR         SET APPROVED */
     { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_VND_DEN          }, /* CL_ST_VND_DEN          SET DENIED */
-    { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_VND_SUCC         }, /* CL_ST_VND_SUCC         13 02H VEND REQUEST */
-    { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_POLL_E,           CL_ST_SES_CMPL,         CL_ST_VND_FAIL         }, /* CL_ST_VND_FAIL         13 03H VEND REQUEST */
+    { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_VND_SUCC         }, /* CL_ST_VND_SUCC         13 02H VEND SUCCESS */
+    { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_POLL_E,           CL_ST_SES_CMPL,         CL_ST_VND_FAIL         }, /* CL_ST_VND_FAIL         13 03H VEND FAILURE */
+    { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E,          CL_ST_POLL_E,           CL_ST_SES_CMPL,         CL_ST_VND_CAN          }, /* CL_ST_VND_CAN          13 01H VEND CANCEL */
 };
 
 static cashless_state_t curState;
@@ -142,13 +146,15 @@ static SemaphoreHandle_t cl_ack_sem;
 static SemaphoreHandle_t xCurActMutex;
 TimerHandle_t xNonResponseTimer;
 TimerHandle_t xTResponseTimer;
-TimerHandle_t xSessionIdleTimer;
+TimerHandle_t xProductSelectionTimer;
+TimerHandle_t xCardReadTimer;
 
 void vTaskCLRx(void *pvParameters);
 void vTaskCLTx(void *pvParameters);
 void vTimerNonRespCb( TimerHandle_t xTimer );
 void vTimerTRespCb( TimerHandle_t xTimer );
-void vTimerSessionTimeoutCb( TimerHandle_t xTimer );
+void vTimerProductSelectionTimeoutCb( TimerHandle_t xTimer );
+void vTimerCardReadTimeoutCb( TimerHandle_t xTimer );
 
 static void CashlessStateReset(void);
 static void CashlessStatePoll(void);
@@ -165,14 +171,17 @@ static bool CashlessIsVendRequest(void);
 static void CashlessStateVendApproved(void);
 static void CashlessStateVendDenied(void);
 static void CashlessStateVendRequest(void);
-static bool CashlessIsSessionTimeout(void);
+static bool CashlessIsProductSelectionTimeout(void);
+static bool CashlessIsCardReadTimeout(void);
 static void CashlessStateSessionComplete(void);
 static bool CashlessIsReset(void);
 static void CashlessReset(void);
 static bool CashlessIsVendSuccess(void);
 static bool CashlessIsVendFailure(void);
+static bool CashlessIsVendCancel(void);
 static void CashlessStateVendSuccess(void);
 static void CashlessStateVendFailure(void);
+static void CashlessStateVendCancel(void);
 
 static void MdbOsUpdateNonRespTime(uint8_t time);
 
@@ -187,7 +196,8 @@ void CashlessInit(void)
     fdCashlessBufRx = xQueueCreate(256, sizeof(uint16_t));
     xNonResponseTimer = xTimerCreate ( "NonRespTimer", MDB_NON_RESP_TIMEOUT * 1000, pdFALSE, ( void * ) 0, vTimerNonRespCb );
     xTResponseTimer = xTimerCreate ( "TRespTimer", MDB_T_RESPONSE_TIMEOUT + 3, pdFALSE, ( void * ) 0, vTimerTRespCb );
-    xSessionIdleTimer = xTimerCreate ( "SesTimeout", 30 * 1000, pdFALSE, ( void * ) 0, vTimerSessionTimeoutCb );
+    xProductSelectionTimer = xTimerCreate ( "SelTimeout", MDB_PRODUCT_SELECTION_TIMEOUT, pdFALSE, ( void * ) 0, vTimerProductSelectionTimeoutCb );
+    xCardReadTimer = xTimerCreate ( "CardTimeout", MDB_CARD_READ_TIMEOUT, pdFALSE, ( void * ) 0, vTimerCardReadTimeoutCb );
 
     mdv_dev_init_struct_t mdb_dev_struct;
     mdb_dev_struct.send_callback = MdbBufSend;
@@ -204,16 +214,18 @@ void CashlessInit(void)
 static void CashlessReset(void)
 {
 
-    cashless_dev.isForceEnable    = false;
-    cashless_dev.isForceDisable   = false;
-    cashless_dev.isEnable         = true;
-    cashless_dev.isChange         = false;
-    cashless_dev.isVendRequest    = false;
-    cashless_dev.isSessiontimeout = false;
-    cashless_dev.isReset          = false;
-    cashless_dev.isVendSuccess    = false;
-    cashless_dev.isVendFailure     = false;
-    cashless_dev.vendStat       = CL_VEND_WAIT;
+    cashless_dev.isForceEnable              = false;
+    cashless_dev.isForceDisable             = false;
+    cashless_dev.isEnable                   = true;
+    cashless_dev.isChange                   = false;
+    cashless_dev.isVendRequest              = false;
+    cashless_dev.isProductSelectionTimeout  = false;
+    cashless_dev.isCardReadTimeout          = false;
+    cashless_dev.isReset                    = false;
+    cashless_dev.isVendSuccess              = false;
+    cashless_dev.isVendFailure              = false;
+    cashless_dev.isVendCancel               = false;
+    cashless_dev.vendStat                   = CL_VEND_WAIT;
 
     mdb_count_non_resp = MDB_COUNT_NON_RESP;
     mdb_count_t_resp = 1;
@@ -263,7 +275,7 @@ void vTaskCLRx(void *pvParameters)
                     xSemaphoreGive(cl_ack_sem);
                     break;
                 case MDB_RET_BEGIN_SESSION:
-                    xTimerStart(xSessionIdleTimer, 0);
+                    xTimerStart(xProductSelectionTimer, 0);
                     xSemaphoreGive(cl_ack_sem);
                     break;
                 case MDB_RET_SESS_CANCEL:
@@ -271,10 +283,12 @@ void vTaskCLRx(void *pvParameters)
                     xSemaphoreGive(cl_ack_sem);
                     break;
                 case MDB_RET_VEND_APPROVED:
+                    xTimerStop(xCardReadTimer, 0);
                     action = CL_ACT_VEND_APRV;
                     xSemaphoreGive(cl_ack_sem);
                     break;
                 case MDB_RET_VEND_DENIED:
+                    xTimerStop(xCardReadTimer, 0);
                     action = CL_ACT_VEND_APRV;
                     xSemaphoreGive(cl_ack_sem);
                     break;
@@ -354,9 +368,14 @@ void vTaskCLTx(void *pvParameters)
             curState = CL_ST_VEND_REQ;
         }
 
-        if (CashlessIsSessionTimeout())
+        if (CashlessIsProductSelectionTimeout())
         {
             curState = CL_ST_SES_CMPL;
+        }
+
+        if (CashlessIsCardReadTimeout())
+        {
+            curState = CL_ST_VND_CAN;
         }
 
         if(CashlessIsReset())
@@ -372,6 +391,11 @@ void vTaskCLTx(void *pvParameters)
         if(CashlessIsVendFailure())
         {
             curState = CL_ST_VND_FAIL;
+        }
+
+        if (CashlessIsVendCancel())
+        {
+            curState = CL_ST_VND_CAN;
         }
 
         switch(curState)
@@ -408,6 +432,7 @@ void vTaskCLTx(void *pvParameters)
                 CashlessStateDisable();
                 break;
             case CL_ST_VEND_REQ:
+                xTimerStart(xCardReadTimer, 0);
                 CashlessStateVendRequest();
                 break;
             case CL_ST_SES_CMPL:
@@ -424,6 +449,9 @@ void vTaskCLTx(void *pvParameters)
                 break;
             case CL_ST_VND_FAIL:
                 CashlessStateVendFailure();
+                break;
+            case CL_ST_VND_CAN:
+                CashlessStateVendCancel();
                 break;
             default:
                 break;
@@ -499,7 +527,7 @@ static void CashlessStateVendRequest(void)
     buf[2] = (cashless_dev.item >> 8) & 0xFF;
     buf[3] = cashless_dev.item & 0xFF;
 
-    xTimerStop(xSessionIdleTimer, 0);
+    xTimerStop(xProductSelectionTimer, 0);
     MdbSendCommand(MDB_VEND_CMD_E, MDB_VEND_REQ_SUBCMD, buf);
 }
 
@@ -528,17 +556,27 @@ static bool CashlessIsVendRequest(void)
     return false;
 }
 
-static bool CashlessIsSessionTimeout(void)
+static bool CashlessIsProductSelectionTimeout(void)
 {
-    if (cashless_dev.isSessiontimeout)
+    if (cashless_dev.isProductSelectionTimeout)
     {
-        cashless_dev.isSessiontimeout = false;
+        cashless_dev.isProductSelectionTimeout = false;
         return true;
     }
 
     return false;
 }
 
+static bool CashlessIsCardReadTimeout(void)
+{
+    if (cashless_dev.isCardReadTimeout)
+    {
+        cashless_dev.isCardReadTimeout = false;
+        return true;
+    }
+
+    return false;
+}
 
 static void CashlessStateVendApproved(void)
 {
@@ -566,6 +604,11 @@ static void CashlessStateVendFailure(void)
     MdbSendCommand(MDB_VEND_CMD_E, MDB_VEND_FAILURE_SUBCMD, NULL);
 }
 
+static void CashlessStateVendCancel(void)
+{
+    MdbSendCommand(MDB_VEND_CMD_E, MDB_VEND_CANCEL_SUBCMD, NULL);
+}
+
 static void CashlessStateVendDenied(void)
 {
     cashless_dev.vendStat = CL_VEND_DENIED;
@@ -585,6 +628,15 @@ void CashlessVendFailureCmd(void)
     // {
         cashless_dev.isVendFailure = true;
     // }
+}
+
+uint8_t CashlessVendCancelCmd(void)
+{
+    if (MdbGetMachineState() != MDB_STATE_VEND)
+        return 1;
+
+    cashless_dev.isVendCancel = true;
+    return 0;
 }
 
 static bool CashlessIsVendSuccess(void)
@@ -609,6 +661,16 @@ static bool CashlessIsVendFailure(void)
     return false;
 }
 
+static bool CashlessIsVendCancel(void)
+{
+    if (cashless_dev.isVendCancel)
+    {
+        cashless_dev.isVendCancel = false;
+        return true;
+    }
+
+    return false;
+}
 
 void CashlessShowState(uint8_t *state1, uint8_t *state2)
 {
@@ -789,10 +851,16 @@ void vTimerTRespCb( TimerHandle_t xTimer )
     MdbBufSend(NULL, 0);
 }
 
-void vTimerSessionTimeoutCb( TimerHandle_t xTimer )
+void vTimerProductSelectionTimeoutCb( TimerHandle_t xTimer )
 {
-    xTimerStop(xSessionIdleTimer, 0);
-    cashless_dev.isSessiontimeout = true;
+    xTimerStop(xProductSelectionTimer, 0);
+    cashless_dev.isProductSelectionTimeout = true;
+}
+
+void vTimerCardReadTimeoutCb( TimerHandle_t xTimer )
+{
+    xTimerStop(xCardReadTimer, 0);
+    cashless_dev.isCardReadTimeout = true;
 }
 
 uint8_t isTimerStart = 0;
