@@ -17,7 +17,7 @@ CFLAGS= -c -fno-common \
 	-mcpu=cortex-m3 -Wall -Wno-main \
 	-mthumb \
 	-DUSE_STDPERIPH_DRIVER \
-	-DSTM32F10X_MD
+	-DSTM32F10X_HD
 
 LDSCRIPT=./stm32f103rc.ld
 LDFLAGS	= --gc-sections,-T$(LDSCRIPT),-lnosys
@@ -38,6 +38,7 @@ INCLUDE = -I./ \
 	  -I./src/hw_rev_adc \
 	  -I./src/hw_voltage_adc \
 	  -I./src/mdb \
+	  -I./src/lcd \
 	  -I./src/cctalk
 
 SRCS = 	./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
@@ -64,9 +65,10 @@ SRCS = 	./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
 	./src/hw_adc.c \
 	./src/hw_voltage_adc/hw_voltage_adc.c \
 	./src/mdb/mdb.c \
-	./src/mdb/mdb_os.c \
+	./src/mdb/cashless.c \
 	./src/cctalk/cctalk.c \
 	./src/cctalk/coinbox.c \
+	./src/lcd/lcd.c \
 	./main.c
 
 OBJS=$(SRCS:.c=.o)
@@ -85,7 +87,7 @@ cleanall:
 	-find . -name '*.map' -exec rm {} \;
 
 clean:
-	rm -fv ./*.o ./src/*.o ./src/console/*.o ./src/console/rcli/*.o
+	rm -fv ./*.o ./src/*.o ./src/console/*.o ./src/console/rcli/*.o ./src/mdb/*.o ./src/cctalk/*.o
 	rm -fv ./output/*.elf
 	rm -fv ./output/*.lst
 	rm -fv ./output/*.out
@@ -98,8 +100,8 @@ $(TARGET).list: $(TARGET).elf
 $(TARGET).bin: $(TARGET).elf
 	$(OC) $(OCFLAGS) $(TARGET).elf $(TARGET).bin
 
-$(TARGET).elf: $(OBJS) ./STM32F10x_StdPeriph_Lib_V3.6.0/Libraries/CMSIS/CM3/DeviceSupport/ST/STM32F10x/startup/gcc_ride7/startup_stm32f10x_md.o
-	@$(CC) -mcpu=cortex-m3 -mthumb -Wl,$(LDFLAGS),-o$(TARGET).elf,-Map,$(TARGET).map ./STM32F10x_StdPeriph_Lib_V3.6.0/Libraries/CMSIS/CM3/DeviceSupport/ST/STM32F10x/startup/gcc_ride7/startup_stm32f10x_md.o $(OBJS)
+$(TARGET).elf: $(OBJS) ./STM32F10x_StdPeriph_Lib_V3.6.0/Libraries/CMSIS/CM3/DeviceSupport/ST/STM32F10x/startup/gcc_ride7/startup_stm32f10x_hd.o
+	@$(CC) -mcpu=cortex-m3 -mthumb -Wl,$(LDFLAGS),-o$(TARGET).elf,-Map,$(TARGET).map ./STM32F10x_StdPeriph_Lib_V3.6.0/Libraries/CMSIS/CM3/DeviceSupport/ST/STM32F10x/startup/gcc_ride7/startup_stm32f10x_hd.o $(OBJS)
 
 %.o: %.c FreeRTOSConfig.h
 	@echo "  CC $<"

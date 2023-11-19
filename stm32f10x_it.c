@@ -30,6 +30,7 @@
 
 extern void UART1InterruptHandler();
 extern void UART3InterruptHandler();
+extern void UART5InterruptHandler();
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
@@ -150,6 +151,20 @@ void USART1_IRQHandler(void)
 void USART3_IRQHandler(void)
 {
     UART3InterruptHandler();
+}
+
+/**
+  * @}
+  */
+
+/**
+  * @brief  This function handles PPP interrupt request.
+  * @param  None
+  * @retval None
+  */
+void UART5_IRQHandler(void)
+{
+    UART5InterruptHandler();
 }
 
 /**
