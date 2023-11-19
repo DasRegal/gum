@@ -15,6 +15,7 @@
 #include "src/hw_adc.h"
 #include "src/mdb/cashless.h"
 #include "src/cctalk/coinbox.h"
+#include "src/lcd/lcd.h"
 
 SemaphoreHandle_t semTickPulse;
 static void PrintBanner(void);
@@ -38,14 +39,9 @@ void main()
     HwAdcInit();
     HwRevPrint();
     HwVoltPrint();
+    LcdInit();
 
-    // MdbOsInit();
     CashlessInit();
-    // // for(int i = 0; i < 50000; i++)
-    // // {
-    // //     asm("NOP");
-    // // }
-    // //MdbPrint();
 
     ConsoleCliStart();
 
