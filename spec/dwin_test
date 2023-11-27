@@ -1,0 +1,44 @@
+#include "../src/lcd/dwin.h"
+{
+    #include "../src/lcd/dwin.c"
+
+    DwinInit();
+
+    describe("RAM command") do
+        uint8_t test_buf_1[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x12, 0x34, 0x01, 0x11, 0x22};
+        for (int i = 0; i < 9; i++)
+        {
+            DwinGetCharHandler(test_buf_1[i]);
+        }
+
+        it("RAM read STATE must be valid")
+        do
+            dwin_dev.state to_eq(DWIN_STATE_FINISH);
+        end
+
+        it("RAM read CMD must be valid")
+        do
+            dwin_dev.cmd to_eq(0x83);
+        end
+
+        it("RAM read VP ADDR must be valid")
+        do
+            dwin_dev.vp_addr to_eq(0x1234);
+        end
+
+        it("RAM read VP BUF must be valid")
+        do
+            uint16_t ref_buf[2] = { 0x1122, 0x3344 };
+            arr_to_eq(dwin_dev.vp_buf, ref_buf, 1);
+
+            DwinInit();
+            uint8_t test_buf_2[20] = { 0x5A, 0xA5, 0x08, 0x83, 0x12, 0x34, 0x02, 0x11, 0x22, 0x33, 0x44};
+            for (int i = 0; i < 11; i++)
+            {
+                DwinGetCharHandler(test_buf_2[i]);
+            }
+            arr_to_eq(dwin_dev.vp_buf, ref_buf, 2);
+        end
+
+    end
+}
