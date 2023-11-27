@@ -1,5 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 #define RUNIT_CHECK_FIRST_FAILURE ru_count_failure != 1 ? : printf("\nFailures:\n\n")
 #define RUNIT_CHECK_NAMESPACE namespace != 1 ? : desc_str = ""
