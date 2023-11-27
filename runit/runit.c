@@ -33,6 +33,13 @@
                               } \
                               ru_test++;
 
+#define assert_false \
+                (   ru_count_failure++, \
+                    RUNIT_CHECK_FIRST_FAILURE, \
+                    printf("%d) %s %s\n\tError %s(%d): Failure stub\n", ru_count_failure, desc_str, namespace == 1 ? "" : it_str, __FILE__, __LINE__) \
+                ); \
+                ru_test++;
+
 #define it(text) it_str = text; ru_it_count++;
 #define do  { \
             namespace++; \
