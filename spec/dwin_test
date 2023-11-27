@@ -41,4 +41,12 @@
         end
 
     end
+
+    describe("Check Push Button") do
+        DwinInit();
+        it("The button must be pressed")
+        do
+            assert_false;
+        end
+    end
 }
