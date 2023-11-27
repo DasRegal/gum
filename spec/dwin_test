@@ -46,6 +46,23 @@
         DwinInit();
         it("The button must be pressed")
         do
+            uint16_t button = 0x1000; /* VP 0x1000 */
+            // DwinIsPushButton to_eq(true);
+            // assert_false;
+        end
+
+        it("The button must be pressed onced")
+        do
+            assert_false;
+        end
+
+        it("The second button pressed should be ignored")
+        do
+            assert_false;
+        end
+
+        it("The second button should be processed after the first button is processed")
+        do
             assert_false;
         end
     end
