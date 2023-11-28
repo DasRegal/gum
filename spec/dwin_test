@@ -43,27 +43,112 @@
     end
 
     describe("Check Push Button") do
-        DwinInit();
+
         it("The button must be pressed")
         do
-            uint16_t button = 0x1000; /* VP 0x1000 */
-            // DwinIsPushButton to_eq(true);
-            // assert_false;
+            DwinInit();
+
+            uint8_t test_buf_1[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x00, 0x01, 0x00, 0x01};
+            for (int i = 0; i < 9; i++)
+            {
+                DwinGetCharHandler(test_buf_1[i]);
+            }
+
+            uint16_t goal_button = 0x1000; /* VP 0x1000 */
+            uint16_t      button = 0;
+            DwinIsPushButton(&button) to_eq(true);
+            button to_eq(goal_button);
         end
 
         it("The button must be pressed onced")
         do
-            assert_false;
+            DwinInit();
+
+            uint8_t test_buf_1[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x00, 0x01, 0x00, 0x01};
+            for (int i = 0; i < 9; i++)
+            {
+                DwinGetCharHandler(test_buf_1[i]);
+            }
+
+            uint16_t      button;
+            DwinIsPushButton(&button) to_eq(true);
+            button to_eq(0x1000);
+            DwinIsPushButton(&button) to_eq(false);
+            button to_eq(0);
         end
 
         it("The second button pressed should be ignored")
         do
-            assert_false;
+            DwinInit();
+
+            uint8_t test_buf_1[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x00, 0x01, 0x00, 0x01};
+            for (int i = 0; i < 9; i++)
+            {
+                DwinGetCharHandler(test_buf_1[i]);
+            }
+
+            uint16_t      button;
+            DwinIsPushButton(&button);
+
+            uint8_t test_buf_2[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x01, 0x01, 0x00, 0x01};
+            for (int i = 0; i < 9; i++)
+            {
+                DwinGetCharHandler(test_buf_2[i]);
+            }
+
+            DwinIsPushButton(&button) to_eq(false);
+            button to_eq(0);
         end
 
         it("The second button should be processed after the first button is processed")
         do
-            assert_false;
+            uint16_t      button;
+
+            DwinInit();
+
+            uint8_t test_buf_1[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x00, 0x01, 0x00, 0x01};
+            for (int i = 0; i < 9; i++)
+            {
+                DwinGetCharHandler(test_buf_1[i]);
+            }
+
+            DwinIsPushButton(&button) to_eq(true);
+            button to_eq(0x1000);
+
+            uint8_t test_buf_2[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x01, 0x01, 0x00, 0x01};
+            for (int i = 0; i < 9; i++)
+            {
+                DwinGetCharHandler(test_buf_2[i]);
+            }
+
+            DwinIsPushButton(&button) to_eq(true);
+            button to_eq(0x1001);
+        end
+
+        it("The second button should be processed if first button is disabled")
+        do
+            uint16_t      button;
+
+            DwinInit();
+
+            uint8_t test_buf_1[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x00, 0x01, 0x00, 0x01};
+            for (int i = 0; i < 9; i++)
+            {
+                DwinGetCharHandler(test_buf_1[i]);
+            }
+
+            DwinButtonEnable(0x1000, false);
+            DwinIsPushButton(&button) to_eq(false);
+            button to_eq(0);
+
+            uint8_t test_buf_2[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x01, 0x01, 0x00, 0x01};
+            for (int i = 0; i < 9; i++)
+            {
+                DwinGetCharHandler(test_buf_2[i]);
+            }
+
+            DwinIsPushButton(&button) to_eq(true);
+            button to_eq(0x1001);
         end
     end
 }
