@@ -41,8 +41,8 @@ do
     fi
 done
 
-echo gcc $RUNIT_PATH/runit.c $SRC -o $RUNIT_PATH/$EXE_FILE -DTEST_MDB -z noexecstack 
-gcc $RUNIT_PATH/runit.c $SRC -o $RUNIT_PATH/$EXE_FILE -DTEST_MDB -z noexecstack 
+echo gcc $RUNIT_PATH/runit.c $SRC -o $RUNIT_PATH/$EXE_FILE -DTEST_MDB
+gcc $RUNIT_PATH/runit.c $SRC -o $RUNIT_PATH/$EXE_FILE -DTEST_MDB
 if [ -f $INC_FILE_NAME ]
 then
     $RUNIT_PATH/$EXE_FILE
