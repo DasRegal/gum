@@ -1,5 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 #define RUNIT_CHECK_FIRST_FAILURE ru_count_failure != 1 ? : printf("\nFailures:\n\n")
 #define RUNIT_CHECK_NAMESPACE namespace != 1 ? : desc_str = ""
@@ -30,6 +32,13 @@
                                   } \
                               } \
                               ru_test++;
+
+#define assert_false \
+                (   ru_count_failure++, \
+                    RUNIT_CHECK_FIRST_FAILURE, \
+                    printf("%d) %s %s\n\tError %s(%d): Failure stub\n", ru_count_failure, desc_str, namespace == 1 ? "" : it_str, __FILE__, __LINE__) \
+                ); \
+                ru_test++;
 
 #define it(text) it_str = text; ru_it_count++;
 #define do  { \
