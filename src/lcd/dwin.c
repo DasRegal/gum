@@ -4,6 +4,7 @@
 #include "dwin.h"
 
 #define DWIN_MAX_BUF_LEN 256
+#define DWIN_MAX_BUTTONS 10
 
 typedef enum
 {
@@ -22,6 +23,13 @@ typedef enum
 
 typedef struct
 {
+    bool is_pushed;
+    bool is_active;
+    bool arr_active[DWIN_MAX_BUTTONS];
+} dwin_button_dev_t;
+
+typedef struct
+{
     dwin_state_t state;
     uint8_t     data_len;
     uint8_t     data_len_cnt;
@@ -31,11 +39,27 @@ typedef struct
     uint8_t     vp_len;
     uint8_t     vp_len_cnt;
     uint16_t    vp_buf[DWIN_MAX_BUF_LEN];
+    dwin_button_dev_t button_dev;
 } dwin_dev_t;
 
 dwin_dev_t dwin_dev;
 
-// bool DwinIsReturnKey(char *data)
+void DwinButtonEnable(uint16_t button, bool is_enable)
+{
+    button = button & 0xFF;
+    if (button > DWIN_MAX_BUTTONS)
+        return;
+
+    dwin_dev.button_dev.arr_active[button] = is_enable;
+}
+
+void DwinAllButtonsEnable(bool is_enable)
+{
+    for (int i = 0; i < DWIN_MAX_BUTTONS; i++)
+    {
+        DwinButtonEnable(i, is_enable);
+    }
+}
 
 void DwinInit(void)
 {
@@ -44,7 +68,11 @@ void DwinInit(void)
     dwin_dev.data_len_cnt = 0;
     dwin_dev.vp_len = 0;
     dwin_dev.vp_len_cnt = 0;
+    dwin_dev.button_dev.is_pushed = 0;
+    dwin_dev.button_dev.is_active = 1;
+    DwinAllButtonsEnable(true);
 }
+
 void DwinGetCharHandler(uint8_t ch)
 {
     switch(dwin_dev.state)
@@ -168,3 +196,35 @@ void DwinGetCharHandler(uint8_t ch)
         
     }
 }
+
+bool DwinIsPushButton(uint16_t *button)
+{
+    if (button == NULL)
+    {
+        return false;
+    }
+
+    *button = 0;
+
+    if (dwin_dev.state != DWIN_STATE_FINISH)
+    {
+        return false;
+    }
+
+    if (false == dwin_dev.button_dev.arr_active[dwin_dev.vp_addr & 0x00FF])
+    {
+        dwin_dev.state = DWIN_STATE_PRESTART;
+        return false;
+    }
+
+    if (dwin_dev.button_dev.is_active && dwin_dev.vp_buf[0] == 0x0001)
+    {
+        dwin_dev.button_dev.is_active = false;
+        *button = dwin_dev.vp_addr & 0xFFFF;
+        return true;
+    }
+
+    dwin_dev.state = DWIN_STATE_PRESTART;
+    return false;
+}
+
