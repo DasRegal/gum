@@ -228,3 +228,8 @@ bool DwinIsPushButton(uint16_t *button)
     return false;
 }
 
+void DwinHandleButton(uint16_t button)
+{
+    dwin_dev.state = DWIN_STATE_PRESTART;
+    dwin_dev.button_dev.is_active = true;
+}
