@@ -1,52 +1,75 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
 
-#define RUNIT_CHECK_FIRST_FAILURE ru_count_failure != 1 ? : printf("\nFailures:\n\n")
-#define RUNIT_CHECK_NAMESPACE namespace != 1 ? : desc_str = ""
-#define describe(text) desc_str = text; it_str = "";
-#define to_eq(x) == x ? \
-                ru_count_pass++ : \
-                (    ru_count_failure++, \
-                     RUNIT_CHECK_FIRST_FAILURE, \
-                     printf("%d) %s %s\n\tError %s(%d): Expected to equal to %d\n", ru_count_failure, desc_str, namespace == 1 ? "" : it_str, __FILE__, __LINE__, x) \
-                ); \
-                ru_test++;
+#define RUNIT_ATTACH_COUNT          10
+#define RUNIT_CHECK_FIRST_FAILURE   ru_count_failure != 1 ? : printf("\nFailures:\n\n")
+#define RUNIT_ERROR_TEXT            printf("%d) %s\n\tError %s(%d): ", ru_count_failure, s, __FILE__, __LINE__)
 
-#define not_to_eq(x) != x ? \
-                ru_count_pass++ : \
-                (   ru_count_failure++, \
-                    RUNIT_CHECK_FIRST_FAILURE, \
-                    printf("%d) %s %s\n\tError %s(%d): Expected to not to equal to %d\n", ru_count_failure, desc_str, namespace == 1 ? "" : it_str, __FILE__, __LINE__, x) \
-                ); \
-                ru_test++;
+#define describe(text)              str[namespace] = text;
+#define context(text)               describe(text)
+#define it(text)                    describe(text)
 
-#define arr_to_eq(_a, _b, _s) for (int i = 0; i < _s; i++) \
-                              { \
-                                  if (_a[i] != _b[i]) \
-                                  { \
-                                      ru_count_failure++; \
-                                      RUNIT_CHECK_FIRST_FAILURE; \
-                                      printf("%d) %s %s\n\tError %s(%d): Elemets with %d index not equal (0x%x != 0x%x)\n", ru_count_failure, desc_str, namespace == 1 ? "" : it_str, __FILE__, __LINE__, i, _a[i], _b[i]); \
-                                  } \
-                              } \
-                              ru_test++;
+#define to_eq(x)                    == x ? \
+                                    ru_count_pass++ : \
+                                    (    ru_count_failure++, \
+                                         RUNIT_CHECK_FIRST_FAILURE, \
+                                         RUNIT_ERROR_TEXT, \
+                                         printf("Expected to equal to %d\n", x) \
+                                    ); \
+                                    ru_test++;
 
-#define it(text) it_str = text; ru_it_count++;
-#define do  { \
-            namespace++; \
-            if (namespace > 2) { printf("\nError (%d): There can only be one level attachment it()do...end\n\n", __LINE__); exit(1); }
-#define end } \
-            namespace--;
+#define not_to_eq(x)                != x ? \
+                                    ru_count_pass++ : \
+                                    (   ru_count_failure++, \
+                                        RUNIT_CHECK_FIRST_FAILURE, \
+                                        RUNIT_ERROR_TEXT, \
+                                        printf("Expected to not to equal to %d\n", x) \
+                                    ); \
+                                    ru_test++;
+
+#define arr_to_eq(_a, _b, _s)       for (int i = 0; i < _s; i++) \
+                                    { \
+                                        if (_a[i] != _b[i]) \
+                                        { \
+                                            ru_count_failure++; \
+                                            RUNIT_CHECK_FIRST_FAILURE; \
+                                            RUNIT_ERROR_TEXT; \
+                                            printf("Elemets with %d index not equal (0x%x != 0x%x)\n", i, _a[i], _b[i]); \
+                                        } \
+                                    } \
+                                    ru_test++;
+
+#define assert_false                (   ru_count_failure++, \
+                                        RUNIT_CHECK_FIRST_FAILURE, \
+                                        RUNIT_ERROR_TEXT, \
+                                        printf("Failure stub\n") \
+                                    ); \
+                                    ru_test++;
+
+#define do                          { \
+                                        sprintf(s, "%s", str[0]); \
+                                        for (int i = 1; i <= namespace; i++) sprintf(s, "%s\n\t%s", s, str[i]); \
+                                        namespace++; \
+                                        if (namespace > RUNIT_ATTACH_COUNT) \
+                                        { \
+                                            printf("\nError (%d): There can only be %d levels attachment it()do...end\n\n", __LINE__, RUNIT_ATTACH_COUNT); \
+                                            exit(1); \
+                                        }
+#define end                         } \
+                                    sprintf(s, ""); \
+                                    namespace--;
 
 #define source(_str)
 
-unsigned int ru_it_count = 0;
-unsigned int ru_test = 0;
-unsigned int ru_count_failure = 0;
-unsigned int ru_count_pass = 0;
-char * desc_str = "";
-char * it_str = "";
-unsigned int namespace = 0;
+unsigned int    ru_test = 0;
+unsigned int    ru_count_failure = 0;
+unsigned int    ru_count_pass = 0;
+char            *str[RUNIT_ATTACH_COUNT];
+char            s[1024];
+unsigned int    namespace = 0;
 
 void main(void)
 {

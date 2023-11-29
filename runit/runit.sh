@@ -1,6 +1,6 @@
 #!/bin/sh
 
-RUNIT_VERSION=1.0V
+RUNIT_VERSION=1.1V
 
 INC_FILE_NAME=includes
 INC_FILES=$1
@@ -41,7 +41,8 @@ do
     fi
 done
 
-gcc $RUNIT_PATH/runit.c $SRC -o $RUNIT_PATH/$EXE_FILE -DTEST_MDB
+echo gcc $RUNIT_PATH/runit.c $SRC -o $RUNIT_PATH/$EXE_FILE -DTEST_MDB
+gcc $RUNIT_PATH/runit.c $SRC -o $RUNIT_PATH/$EXE_FILE -DTEST_MDB -z noexecstack
 if [ -f $INC_FILE_NAME ]
 then
     $RUNIT_PATH/$EXE_FILE
@@ -50,5 +51,5 @@ else
     echo "[RUnit] Error: compile error."
     exit 1
 fi
-# rm $INC_FILE_NAME
+rm $INC_FILE_NAME
 rm $EXE_FILE
