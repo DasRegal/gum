@@ -10,7 +10,7 @@
 
 #define describe(text)              str[namespace] = text;
 #define context(text)               describe(text)
-#define it(text)                    describe(text)
+#define it(text)                    describe(text) ru_is_it = 1;
 
 #define to_eq(x)                    == x ? \
                                     ru_count_pass++ : \
@@ -50,6 +50,7 @@
                                     ru_test++;
 
 #define do                          { \
+                                        if (ru_func != NULL && ru_is_it) ru_func(); \
                                         sprintf(s, "%s", str[0]); \
                                         for (int i = 1; i <= namespace; i++) sprintf(s, "%s\n\t%s", s, str[i]); \
                                         namespace++; \
@@ -60,9 +61,14 @@
                                         }
 #define end                         } \
                                     sprintf(s, ""); \
-                                    namespace--;
+                                    namespace--; \
+                                    if (ru_is_it) ru_is_it = 0;
 
 #define source(_str)
+
+#define before_each  void ru_func()
+
+__attribute__((weak)) void ru_func();
 
 unsigned int    ru_test = 0;
 unsigned int    ru_count_failure = 0;
@@ -70,9 +76,11 @@ unsigned int    ru_count_pass = 0;
 char            *str[RUNIT_ATTACH_COUNT];
 char            s[1024];
 unsigned int    namespace = 0;
+char            ru_is_it = 0;
 
 void main(void)
 {
     #include "includes"
     printf("\n%d examples, %d failures\n", ru_test, ru_count_failure);
+
 }
