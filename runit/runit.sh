@@ -95,9 +95,17 @@ fi
 
 $COMPILE_CMD
 
-if [ -f $INC_FILE_NAME ]
+if [ -f $RUNIT_PATH/$EXE_FILE ]
 then
     $RUNIT_PATH/$EXE_FILE
+else
+    echo
+    echo "[RUnit] Error: compile error."
+    exit 1
+fi
+
+if [ -f $INC_FILE_NAME ]
+then
     rm $EXE_FILE
     rm $INC_FILE_NAME
 else
