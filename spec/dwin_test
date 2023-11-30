@@ -2,14 +2,11 @@
 {
     #include "../src/lcd/dwin.c"
 
-    DwinInit();
-
     describe("RAM command") do
         uint8_t test_buf_1[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x12, 0x34, 0x01, 0x11, 0x22};
-        for (int i = 0; i < 9; i++)
-        {
-            DwinGetCharHandler(test_buf_1[i]);
-        }
+
+        DwinInit();
+        for (int i = 0; i < 9; i++) DwinGetCharHandler(test_buf_1[i]);
 
         it("RAM read STATE must be valid")
         do
@@ -28,32 +25,27 @@
 
         it("RAM read VP BUF must be valid")
         do
+            uint8_t test_buf_2[20] = { 0x5A, 0xA5, 0x08, 0x83, 0x12, 0x34, 0x02, 0x11, 0x22, 0x33, 0x44};
             uint16_t ref_buf[2] = { 0x1122, 0x3344 };
             arr_to_eq(dwin_dev.vp_buf, ref_buf, 1);
 
             DwinInit();
-            uint8_t test_buf_2[20] = { 0x5A, 0xA5, 0x08, 0x83, 0x12, 0x34, 0x02, 0x11, 0x22, 0x33, 0x44};
-            for (int i = 0; i < 11; i++)
-            {
-                DwinGetCharHandler(test_buf_2[i]);
-            }
+            for (int i = 0; i < 11; i++) DwinGetCharHandler(test_buf_2[i]);
+
             arr_to_eq(dwin_dev.vp_buf, ref_buf, 2);
         end
-
     end
 
-    describe("Check Push Button") do
+    before_each
+    {
+        uint8_t test_buf_1[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x00, 0x01, 0x00, 0x01};
+        DwinInit();
+        for (int i = 0; i < 9; i++) DwinGetCharHandler(test_buf_1[i]);
+    }
 
+    describe("Check Push Button") do
         it("The button must be pressed")
         do
-            DwinInit();
-
-            uint8_t test_buf_1[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x00, 0x01, 0x00, 0x01};
-            for (int i = 0; i < 9; i++)
-            {
-                DwinGetCharHandler(test_buf_1[i]);
-            }
-
             uint16_t goal_button = 0x1000; /* VP 0x1000 */
             uint16_t      button = 0;
             DwinIsPushButton(&button) to_eq(true);
@@ -62,14 +54,6 @@
 
         it("The button must be pressed onced")
         do
-            DwinInit();
-
-            uint8_t test_buf_1[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x00, 0x01, 0x00, 0x01};
-            for (int i = 0; i < 9; i++)
-            {
-                DwinGetCharHandler(test_buf_1[i]);
-            }
-
             uint16_t      button;
             DwinIsPushButton(&button) to_eq(true);
             button to_eq(0x1000);
@@ -79,22 +63,11 @@
 
         it("The second button pressed should be ignored")
         do
-            DwinInit();
-
-            uint8_t test_buf_1[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x00, 0x01, 0x00, 0x01};
-            for (int i = 0; i < 9; i++)
-            {
-                DwinGetCharHandler(test_buf_1[i]);
-            }
-
             uint16_t      button;
             DwinIsPushButton(&button);
 
             uint8_t test_buf_2[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x01, 0x01, 0x00, 0x01};
-            for (int i = 0; i < 9; i++)
-            {
-                DwinGetCharHandler(test_buf_2[i]);
-            }
+            for (int i = 0; i < 9; i++) DwinGetCharHandler(test_buf_2[i]);
 
             DwinIsPushButton(&button) not_to_eq(true);
             button to_eq(0);
@@ -102,13 +75,8 @@
 
         it("The second button should be processed after the first button is processed")
         do
-            uint8_t     test_buf_1[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x00, 0x01, 0x00, 0x01};
             uint8_t     test_buf_2[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x01, 0x01, 0x00, 0x01};
             uint16_t    button;
-
-            DwinInit();
-
-            for (int i = 0; i < 9; i++) DwinGetCharHandler(test_buf_1[i]);
 
             DwinIsPushButton(&button) to_eq(true);
             button to_eq(0x1000);
@@ -123,25 +91,14 @@
 
         it("The second button should be processed if first button is disabled")
         do
+            uint8_t test_buf_2[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x01, 0x01, 0x00, 0x01};
             uint16_t      button;
-
-            DwinInit();
-
-            uint8_t test_buf_1[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x00, 0x01, 0x00, 0x01};
-            for (int i = 0; i < 9; i++)
-            {
-                DwinGetCharHandler(test_buf_1[i]);
-            }
 
             DwinButtonEnable(0x1000, false);
             DwinIsPushButton(&button) not_to_eq(true);
             button to_eq(0);
 
-            uint8_t test_buf_2[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x01, 0x01, 0x00, 0x01};
-            for (int i = 0; i < 9; i++)
-            {
-                DwinGetCharHandler(test_buf_2[i]);
-            }
+            for (int i = 0; i < 9; i++) DwinGetCharHandler(test_buf_2[i]);
 
             DwinIsPushButton(&button) to_eq(true);
             button to_eq(0x1001);
