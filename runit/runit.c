@@ -6,14 +6,14 @@
 
 #define RUNIT_ATTACH_COUNT          10
 #define RUNIT_CHECK_FIRST_FAILURE   ru_count_failure != 1 ? true : printf("\nFailures:\n\n")
-#define RUNIT_ERROR_TEXT            printf("%d) %s\n\tError %s(%d): ", ru_count_failure, s, __FILE__, __LINE__)
+#define RUNIT_ERROR_TEXT            printf("%d) %s\n\tError %s(%d): ", ru_count_failure, ru_err_buf, __FILE__, __LINE__)
 
-#define describe(text)              str[namespace] = text;
+#define describe(text)              ru_tmp_str[ru_namespace] = text;
 #define context(text)               describe(text)
 #define it(text)                    describe(text) ru_is_it = 1;
 
 #define to_eq(x)                    == x ? \
-                                    ru_count_pass++ : \
+                                    true : \
                                     (    ru_count_failure++, \
                                          RUNIT_CHECK_FIRST_FAILURE, \
                                          RUNIT_ERROR_TEXT, \
@@ -22,7 +22,7 @@
                                     ru_test++;
 
 #define not_to_eq(x)                != x ? \
-                                    ru_count_pass++ : \
+                                    true : \
                                     (   ru_count_failure++, \
                                         RUNIT_CHECK_FIRST_FAILURE, \
                                         RUNIT_ERROR_TEXT, \
@@ -50,32 +50,31 @@
                                     ru_test++;
 
 #define do                          { \
-                                        if (ru_func != NULL && ru_is_it) ru_func(); \
-                                        sprintf(s, "%s", str[0]); \
-                                        for (int i = 1; i <= namespace; i++) { strcat(s, "\n\t"); strcat(s, str[i]);} \
-                                        namespace++; \
-                                        if (namespace > RUNIT_ATTACH_COUNT) \
+                                        if (ru_before_each_func != NULL && ru_is_it) ru_before_each_func(); \
+                                        sprintf(ru_err_buf, "%s", ru_tmp_str[0]); \
+                                        for (int i = 1; i <= ru_namespace; i++) { strcat(ru_err_buf, "\n\t"); strcat(ru_err_buf, ru_tmp_str[i]); } \
+                                        ru_namespace++; \
+                                        if (ru_namespace > RUNIT_ATTACH_COUNT) \
                                         { \
                                             printf("\nError (%d): There can only be %d levels attachment it()do...end\n\n", __LINE__, RUNIT_ATTACH_COUNT); \
                                             exit(1); \
                                         }
 #define end                         } \
-                                    sprintf(s, "%s", ""); \
-                                    namespace--; \
+                                    sprintf(ru_err_buf, "%s", ""); \
+                                    ru_namespace--; \
                                     if (ru_is_it) ru_is_it = 0;
 
 #define source(_str)
 
-#define before_each  void ru_func()
+#define before_each  void ru_before_each_func()
 
-__attribute__((weak)) void ru_func();
+__attribute__((weak)) void ru_before_each_func();
 
 unsigned int    ru_test = 0;
 unsigned int    ru_count_failure = 0;
-unsigned int    ru_count_pass = 0;
-char            *str[RUNIT_ATTACH_COUNT];
-char            s[1024];
-unsigned int    namespace = 0;
+char           *ru_tmp_str[RUNIT_ATTACH_COUNT];
+char            ru_err_buf[1024];
+unsigned int    ru_namespace = 0;
 char            ru_is_it = 0;
 
 int main(void)
