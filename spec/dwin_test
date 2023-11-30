@@ -2,11 +2,6 @@
 {
     #include "../src/lcd/dwin.c"
 
-    before_each
-    {
-        printf("[!!!]\n");
-    }
-    
     DwinInit();
 
     describe("RAM command") do
@@ -78,7 +73,7 @@
             uint16_t      button;
             DwinIsPushButton(&button) to_eq(true);
             button to_eq(0x1000);
-            DwinIsPushButton(&button) to_eq(false);
+            DwinIsPushButton(&button) not_to_eq(true);
             button to_eq(0);
         end
 
@@ -101,7 +96,7 @@
                 DwinGetCharHandler(test_buf_2[i]);
             }
 
-            DwinIsPushButton(&button) to_eq(false);
+            DwinIsPushButton(&button) not_to_eq(true);
             button to_eq(0);
         end
 
@@ -139,7 +134,7 @@
             }
 
             DwinButtonEnable(0x1000, false);
-            DwinIsPushButton(&button) to_eq(false);
+            DwinIsPushButton(&button) not_to_eq(true);
             button to_eq(0);
 
             uint8_t test_buf_2[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x01, 0x01, 0x00, 0x01};
