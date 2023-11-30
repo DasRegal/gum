@@ -1,13 +1,57 @@
-#!/bin/sh
+#!/bin/bash
 
 RUNIT_VERSION=1.1V
 
 INC_FILE_NAME=includes
-INC_FILES=$1
 EXE_FILE=runit_exe
 RUNIT_PATH=$(pwd)
 PRJ_PATH="$RUNIT_PATH/.."
 SPEC_DIR="$PRJ_PATH/spec"
+
+function print_usage {
+    echo "Usage: ./runit.sh [options]"
+    echo "type: './runit.sh --help' for more"
+}
+
+function print_version {
+    echo "RUnit Test framework $RUNIT_VERSION"
+}
+
+function print_help {
+    echo "Usage: ./runit.sh [options]"
+    echo "available options:"
+    echo "  -h, --help"
+    echo "      prints this page"
+    echo "  -v, --verbose"
+    echo "      be verbose"
+    echo "  -V, --version"
+    echo "      print program version"
+    echo ""
+}
+
+VERBOSE_MODE=
+
+for key in "$@"
+do
+case $key in
+    --help|-h)
+        print_help
+        exit 0
+        ;;
+    --version|-V)
+        print_version
+        exit 0
+        ;;
+    --verbose|-v)
+        VERBOSE_MODE=1
+        ;;
+    *)
+        echo "Invalid option."
+        print_usage
+        exit 1
+        ;;
+esac
+done
 
 echo "RUnit $RUNIT_VERSION"
 
@@ -30,7 +74,6 @@ then
 fi
 
 SRC=""
-
 for eachfile in $INC_FILES
 do
     echo "#include \"$eachfile\"" >> $INC_FILE_NAME
@@ -41,15 +84,24 @@ do
     fi
 done
 
-echo gcc $RUNIT_PATH/runit.c $SRC -o $RUNIT_PATH/$EXE_FILE -DTEST_MDB
-gcc $RUNIT_PATH/runit.c $SRC -o $RUNIT_PATH/$EXE_FILE -DTEST_MDB -z noexecstack
+COMPILE_CMD="gcc $RUNIT_PATH/runit.c $SRC -o $RUNIT_PATH/$EXE_FILE -DTEST_MDB"
+
+if [ "$VERBOSE_MODE" ]
+then
+    echo
+    echo $COMPILE_CMD
+    echo
+fi
+
+$COMPILE_CMD
+
 if [ -f $INC_FILE_NAME ]
 then
     $RUNIT_PATH/$EXE_FILE
+    rm $EXE_FILE
+    rm $INC_FILE_NAME
 else
     echo
     echo "[RUnit] Error: compile error."
     exit 1
 fi
-rm $INC_FILE_NAME
-rm $EXE_FILE

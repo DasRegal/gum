@@ -5,7 +5,7 @@
 #include <string.h>
 
 #define RUNIT_ATTACH_COUNT          10
-#define RUNIT_CHECK_FIRST_FAILURE   ru_count_failure != 1 ? : printf("\nFailures:\n\n")
+#define RUNIT_CHECK_FIRST_FAILURE   ru_count_failure != 1 ? true : printf("\nFailures:\n\n")
 #define RUNIT_ERROR_TEXT            printf("%d) %s\n\tError %s(%d): ", ru_count_failure, s, __FILE__, __LINE__)
 
 #define describe(text)              str[namespace] = text;
@@ -52,7 +52,7 @@
 #define do                          { \
                                         if (ru_func != NULL && ru_is_it) ru_func(); \
                                         sprintf(s, "%s", str[0]); \
-                                        for (int i = 1; i <= namespace; i++) sprintf(s, "%s\n\t%s", s, str[i]); \
+                                        for (int i = 1; i <= namespace; i++) { strcat(s, "\n\t"); strcat(s, str[i]);} \
                                         namespace++; \
                                         if (namespace > RUNIT_ATTACH_COUNT) \
                                         { \
@@ -60,7 +60,7 @@
                                             exit(1); \
                                         }
 #define end                         } \
-                                    sprintf(s, ""); \
+                                    sprintf(s, "%s", ""); \
                                     namespace--; \
                                     if (ru_is_it) ru_is_it = 0;
 
@@ -78,9 +78,9 @@ char            s[1024];
 unsigned int    namespace = 0;
 char            ru_is_it = 0;
 
-void main(void)
+int main(void)
 {
     #include "includes"
     printf("\n%d examples, %d failures\n", ru_test, ru_count_failure);
-
+    return 0;
 }
