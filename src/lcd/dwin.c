@@ -282,3 +282,20 @@ void DwinReset(void)
     char buf[4] = { 0x55, 0xAA , 0x5A, 0xA5 };
     DwinWriteCmd(0x0004, buf, 4);
 }
+
+void DwinButtonEn(uint16_t button, bool isEnable)
+{
+    char buf[2] = { 0, 0 };
+
+    if (dwin_dev.button_dev.arr_active[button & 0x00FF] == isEnable)
+        return;
+
+    dwin_dev.button_dev.arr_active[button & 0x00FF] = isEnable;
+
+    if(!isEnable)
+    {
+        buf[1] = 1;
+    }
+
+    LcdWrite(button, buf, 2);   
+}

@@ -46,32 +46,7 @@ void LcdInit(void)
 
     xTaskCreate(vTaskLcdBuf, (const char*)"Lcd", 256, NULL, tskIDLE_PRIORITY + 2, (TaskHandle_t*)NULL);
     xTaskCreate(vTaskLcdButton, (const char*)"Lcd B", 256, NULL, tskIDLE_PRIORITY + 2, (TaskHandle_t*)NULL);
-
-    DwinReset();
-    // DwinSetPage(0);
 }
-// Switch page 5A A5 07 82 0084 5A01 0001
-
-// void vTaskLcd(void *pvParameters)
-// {
-//     char b1[2] = { 0x00, 0x00 };
-//     bool f = true;
-//     for( ;; )
-//     {
-//         if (f)
-//         {
-//             b1[1] = 0;
-//             f = false;
-//         }
-//         else
-//         {
-//             b1[1] = 1;
-//             f = true;
-//         }
-//         LcdWrite(0x1000, b1, 2);
-//         vTaskDelay(500);
-//     }
-// }
 
 void vTaskLcdBuf(void *pvParameters)
 {
@@ -84,13 +59,8 @@ void vTaskLcdBuf(void *pvParameters)
     {
         if (xQueueReceive(fdLcdBuf, &ch, portMAX_DELAY) == pdPASS)
         {
-            if (DwinGetCharHandler(ch) == true)
-            {
-                // USART_ITConfig(UART5, USART_IT_RXNE, DISABLE);
-            }
+            DwinGetCharHandler(ch);
         }
-
-        
     }
 }
 
@@ -100,23 +70,19 @@ void vTaskLcdButton(void *pvParameters)
     uint16_t button;
     char s[20];
     char b1[4] = { 0x00, 0x00 , 0x00, 0x00 };
-// Switch page 5A A5 07 82 0084 5A01 0001
-
+    DwinReset();
+    vTaskDelay(50);
     for(;;)
     {
         if (DwinIsPushButton(&button))
         {
             if((button & 0xff) == 0)
             {
-                b1[0] = 0;
-                b1[1] = 0;
-                LcdWrite(0x1001, b1, 2);
+                DwinButtonEn(0x1002, true);
             }
             if((button & 0xff) == 1)
             {
-                b1[0] = 0;
-                b1[1] = 0;
-                LcdWrite(0x1000, b1, 2);
+                DwinButtonEn(0x1002, false);
             }
             if((button & 0xff) == 2)
             {
@@ -129,7 +95,6 @@ void vTaskLcdButton(void *pvParameters)
             sprintf(s, "\rPush button %d\r\n", button & 0xff);
             PRINT_OS(s);
             DwinHandleButton(button);
-            // USART_ITConfig(UART5, USART_IT_RXNE, ENABLE);
         }
         vTaskDelay(100);
     }

@@ -8,5 +8,6 @@ bool DwinIsPushButton(uint16_t *button);
 void DwinHandleButton(uint16_t button);
 void DwinSetPage(uint8_t page);
 void DwinReset(void);
+void DwinButtonEn(uint16_t button, bool isEnable);
 
 #endif /* _DWIN_H */
