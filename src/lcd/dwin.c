@@ -3,49 +3,10 @@
 #include <stdint.h>
 #include "dwin.h"
 
-#define DWIN_MAX_BUF_LEN 256
-#define DWIN_MAX_BUTTONS 10
-
-typedef enum
-{
-    DWIN_STATE_PRESTART,
-    DWIN_STATE_START,
-    DWIN_STATE_LEN,
-    DWIN_STATE_COMMAND,
-    DWIN_STATE_READ_RAM_VPL,
-    DWIN_STATE_READ_RAM_VPH,
-    DWIN_STATE_READ_RAM_LEN,
-    DWIN_STATE_RW_RAM_DATA_L,
-    DWIN_STATE_RW_RAM_DATA_H,
-    DWIN_STATE_WRITE_RAM_VPL,
-    DWIN_STATE_WRITE_RAM_VPH,
-    DWIN_STATE_DATA,
-    DWIN_STATE_FINISH
-} dwin_state_t;
-
-typedef struct
-{
-    bool is_pushed;
-    bool is_active;
-    bool arr_active[DWIN_MAX_BUTTONS];
-} dwin_button_dev_t;
-
-typedef struct
-{
-    dwin_state_t state;
-    uint8_t     data_len;
-    uint8_t     data_len_cnt;
-    uint8_t     data[DWIN_MAX_BUF_LEN];
-    uint8_t     cmd;
-    uint16_t    vp_addr;
-    uint8_t     vp_len;
-    uint8_t     vp_len_cnt;
-    uint16_t    vp_buf[DWIN_MAX_BUF_LEN];
-    dwin_button_dev_t button_dev;
-    void        (*cb_send)(const char*, uint8_t);
-} dwin_dev_t;
-
 dwin_dev_t dwin_dev;
+
+static void DwinBufSend(char * buf, uint8_t len);
+static void DwinWriteCmd(uint16_t vp, char *data, uint8_t len);
 
 void DwinHandleButton(uint16_t button)
 {
@@ -248,27 +209,6 @@ bool DwinIsPushButton(uint16_t *button)
     return false;
 }
 
-void DwinBufSend(char * buf, uint8_t len)
-{
-    if (dwin_dev.cb_send != NULL)
-        dwin_dev.cb_send(buf, len);
-}
-
-void DwinWriteCmd(uint16_t vp, char *data, uint8_t len)
-{
-    char buf[6] = { 0x5A, 0xA5, 0x00, 0x82, 0x00, 0x00 };
-
-    if (len > 0xFF - 1)
-        return;
-
-    buf[2] = len + 3;
-    buf[4] = (char)((vp >> 8) & 0xFF);
-    buf[5] = (char)(vp & 0xFF);
-    DwinBufSend(buf, 6);
-
-    DwinBufSend(data, len);
-}
-
 void DwinSetPage(uint8_t page)
 {
     char buf[4] = { 0x5A, 0x01 , 0x00, 0x00 };
@@ -297,5 +237,31 @@ void DwinButtonEn(uint16_t button, bool isEnable)
         buf[1] = 1;
     }
 
-    LcdWrite(button, buf, 2);   
+    DwinWriteCmd(button, buf, 2);   
+}
+
+dwin_dev_t *DwinGetDev(void)
+{
+    return &dwin_dev;
+}
+
+static void DwinBufSend(char * buf, uint8_t len)
+{
+    if (dwin_dev.cb_send != NULL)
+        dwin_dev.cb_send(buf, len);
+}
+
+static void DwinWriteCmd(uint16_t vp, char *data, uint8_t len)
+{
+    char buf[6] = { 0x5A, 0xA5, 0x00, 0x82, 0x00, 0x00 };
+
+    if (len > 0xFF - 1)
+        return;
+
+    buf[2] = len + 3;
+    buf[4] = (char)((vp >> 8) & 0xFF);
+    buf[5] = (char)(vp & 0xFF);
+    DwinBufSend(buf, 6);
+
+    DwinBufSend(data, len);
 }
