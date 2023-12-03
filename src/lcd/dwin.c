@@ -15,8 +15,10 @@ typedef enum
     DWIN_STATE_READ_RAM_VPL,
     DWIN_STATE_READ_RAM_VPH,
     DWIN_STATE_READ_RAM_LEN,
-    DWIN_STATE_READ_RAM_DATA_L,
-    DWIN_STATE_READ_RAM_DATA_H,
+    DWIN_STATE_RW_RAM_DATA_L,
+    DWIN_STATE_RW_RAM_DATA_H,
+    DWIN_STATE_WRITE_RAM_VPL,
+    DWIN_STATE_WRITE_RAM_VPH,
     DWIN_STATE_DATA,
     DWIN_STATE_FINISH
 } dwin_state_t;
@@ -40,9 +42,16 @@ typedef struct
     uint8_t     vp_len_cnt;
     uint16_t    vp_buf[DWIN_MAX_BUF_LEN];
     dwin_button_dev_t button_dev;
+    void        (*cb_send)(const char*, uint8_t);
 } dwin_dev_t;
 
 dwin_dev_t dwin_dev;
+
+void DwinHandleButton(uint16_t button)
+{
+    dwin_dev.state = DWIN_STATE_PRESTART;
+    dwin_dev.button_dev.is_active = true;
+}
 
 void DwinButtonEnable(uint16_t button, bool is_enable)
 {
@@ -61,7 +70,7 @@ void DwinAllButtonsEnable(bool is_enable)
     }
 }
 
-void DwinInit(void)
+void DwinInit(void (*cb_send)(const char*, uint8_t))
 {
     dwin_dev.state = DWIN_STATE_PRESTART;
     dwin_dev.data_len = 0;
@@ -70,10 +79,12 @@ void DwinInit(void)
     dwin_dev.vp_len_cnt = 0;
     dwin_dev.button_dev.is_pushed = 0;
     dwin_dev.button_dev.is_active = 1;
+    if (cb_send != NULL)
+        dwin_dev.cb_send = cb_send;
     DwinAllButtonsEnable(true);
 }
 
-void DwinGetCharHandler(uint8_t ch)
+bool DwinGetCharHandler(uint8_t ch)
 {
     switch(dwin_dev.state)
     {
@@ -96,14 +107,14 @@ void DwinGetCharHandler(uint8_t ch)
             break;
         case DWIN_STATE_COMMAND:
             dwin_dev.cmd = ch;
-            if (ch == 0x83)
+            if (ch == 0x83 || ch == 0x82)
             {
                 dwin_dev.state = DWIN_STATE_READ_RAM_VPH;
                 dwin_dev.vp_len_cnt = 0;
             }
             else
             {
-                dwin_dev.state = DWIN_STATE_DATA;
+                dwin_dev.state = DWIN_STATE_FINISH;
             }
 
             dwin_dev.data_len_cnt++;
@@ -123,7 +134,11 @@ void DwinGetCharHandler(uint8_t ch)
         case DWIN_STATE_READ_RAM_VPL:
             dwin_dev.vp_addr += ch & 0xFF;
             dwin_dev.data_len_cnt++;
-            dwin_dev.state = DWIN_STATE_READ_RAM_LEN;
+
+            if ( dwin_dev.cmd == 0x83)
+                dwin_dev.state = DWIN_STATE_READ_RAM_LEN;
+            else
+                dwin_dev.state = DWIN_STATE_RW_RAM_DATA_H;
 
             if (dwin_dev.data_len_cnt >= dwin_dev.data_len)
             {
@@ -135,7 +150,7 @@ void DwinGetCharHandler(uint8_t ch)
         case DWIN_STATE_READ_RAM_LEN:
             dwin_dev.vp_len = ch;
             dwin_dev.data_len_cnt++;
-            dwin_dev.state = DWIN_STATE_READ_RAM_DATA_H;
+            dwin_dev.state = DWIN_STATE_RW_RAM_DATA_H;
 
             if (dwin_dev.data_len_cnt >= dwin_dev.data_len)
             {
@@ -144,10 +159,10 @@ void DwinGetCharHandler(uint8_t ch)
             }
 
             break;
-        case DWIN_STATE_READ_RAM_DATA_H:
+        case DWIN_STATE_RW_RAM_DATA_H:
             dwin_dev.vp_buf[dwin_dev.vp_len_cnt] = ch << 8;
             dwin_dev.data_len_cnt++;
-            dwin_dev.state = DWIN_STATE_READ_RAM_DATA_L;
+            dwin_dev.state = DWIN_STATE_RW_RAM_DATA_L;
 
             if (dwin_dev.data_len_cnt >= dwin_dev.data_len)
             {
@@ -156,7 +171,7 @@ void DwinGetCharHandler(uint8_t ch)
             }
 
             break;
-        case DWIN_STATE_READ_RAM_DATA_L:
+        case DWIN_STATE_RW_RAM_DATA_L:
             dwin_dev.vp_buf[dwin_dev.vp_len_cnt] += ch & 0xFF;
             dwin_dev.vp_len_cnt++;
             dwin_dev.data_len_cnt++;
@@ -167,7 +182,7 @@ void DwinGetCharHandler(uint8_t ch)
                 break;
             }
 
-            dwin_dev.state = DWIN_STATE_READ_RAM_DATA_H;
+            dwin_dev.state = DWIN_STATE_RW_RAM_DATA_H;
             if (dwin_dev.data_len_cnt >= dwin_dev.data_len)
             {
                 dwin_dev.state = DWIN_STATE_FINISH;
@@ -193,8 +208,13 @@ void DwinGetCharHandler(uint8_t ch)
 
     if (dwin_dev.state == DWIN_STATE_FINISH)
     {
-        
+        if (dwin_dev.cmd == 0x82)
+            DwinHandleButton(0);
+
+        return true;
     }
+
+    return false;
 }
 
 bool DwinIsPushButton(uint16_t *button)
@@ -228,8 +248,37 @@ bool DwinIsPushButton(uint16_t *button)
     return false;
 }
 
-void DwinHandleButton(uint16_t button)
+void DwinBufSend(char * buf, uint8_t len)
 {
-    dwin_dev.state = DWIN_STATE_PRESTART;
-    dwin_dev.button_dev.is_active = true;
+    if (dwin_dev.cb_send != NULL)
+        dwin_dev.cb_send(buf, len);
+}
+
+void DwinWriteCmd(uint16_t vp, char *data, uint8_t len)
+{
+    char buf[6] = { 0x5A, 0xA5, 0x00, 0x82, 0x00, 0x00 };
+
+    if (len > 0xFF - 1)
+        return;
+
+    buf[2] = len + 3;
+    buf[4] = (char)((vp >> 8) & 0xFF);
+    buf[5] = (char)(vp & 0xFF);
+    DwinBufSend(buf, 6);
+
+    DwinBufSend(data, len);
+}
+
+void DwinSetPage(uint8_t page)
+{
+    char buf[4] = { 0x5A, 0x01 , 0x00, 0x00 };
+
+    buf[3] = page;
+    DwinWriteCmd(0x0084, buf, 4);
+}
+
+void DwinReset(void)
+{
+    char buf[4] = { 0x55, 0xAA , 0x5A, 0xA5 };
+    DwinWriteCmd(0x0004, buf, 4);
 }

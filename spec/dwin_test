@@ -5,7 +5,7 @@
     describe("RAM command") do
         uint8_t test_buf_1[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x12, 0x34, 0x01, 0x11, 0x22};
 
-        DwinInit();
+        DwinInit(NULL);
         for (int i = 0; i < 9; i++) DwinGetCharHandler(test_buf_1[i]);
 
         it("RAM read STATE must be valid")
@@ -29,7 +29,7 @@
             uint16_t ref_buf[2] = { 0x1122, 0x3344 };
             arr_to_eq(dwin_dev.vp_buf, ref_buf, 1);
 
-            DwinInit();
+            DwinInit(NULL);
             for (int i = 0; i < 11; i++) DwinGetCharHandler(test_buf_2[i]);
 
             arr_to_eq(dwin_dev.vp_buf, ref_buf, 2);
@@ -39,7 +39,7 @@
     before_each
     {
         uint8_t test_buf_1[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x10, 0x00, 0x01, 0x00, 0x01};
-        DwinInit();
+        DwinInit(NULL);
         for (int i = 0; i < 9; i++) DwinGetCharHandler(test_buf_1[i]);
     }
 

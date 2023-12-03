@@ -12,11 +12,14 @@
 #include "semphr.h"
 #include "event_groups.h"
 
+#include "main.h"
 #include "lcd.h"
+#include "dwin.h"
 
 #define LCD_BUF_LEN     0xFF
 
 void vTaskLcdBuf(void *pvParameters);
+void vTaskLcdButton(void *pvParameters);
 
 static void LcdUartInit(void);
 static void LcdSendString(const char *pucBuffer, uint8_t len);
@@ -24,10 +27,10 @@ static void LcdSendString(const char *pucBuffer, uint8_t len);
 
 char lcdBuf[LCD_BUF_LEN];
 
-typedef sctruct
+typedef struct
 {
     char *buf;
-    char index;
+    uint8_t index;
 } lcd_dev_t;
 
 lcd_dev_t lcd_dev = { .buf = lcdBuf, .index = 0 };
@@ -36,12 +39,16 @@ QueueHandle_t fdLcdBuf;
 
 void LcdInit(void)
 {
+    DwinInit(LcdSendString);
     LcdUartInit();
 
     fdLcdBuf = xQueueCreate(LCD_BUF_LEN, sizeof(char));
 
-    xTaskCreate(vTaskLcdBuf, (const char*)"Lcd", 256, (void*)fdBuferConsoleRec, tskIDLE_PRIORITY + 2, (TaskHandle_t*)NULL);
+    xTaskCreate(vTaskLcdBuf, (const char*)"Lcd", 256, NULL, tskIDLE_PRIORITY + 2, (TaskHandle_t*)NULL);
+    xTaskCreate(vTaskLcdButton, (const char*)"Lcd B", 256, NULL, tskIDLE_PRIORITY + 2, (TaskHandle_t*)NULL);
 
+    DwinReset();
+    // DwinSetPage(0);
 }
 // Switch page 5A A5 07 82 0084 5A01 0001
 
@@ -66,30 +73,65 @@ void LcdInit(void)
 //     }
 // }
 
-void LcdUartHandler(char ch)
-{
-    lcd_dev.buf[lcd_dev.index] = ch;
-
-    if (lcd_dev.buf[0] == 0x5A &&
-        lcd_dev.buf[1] == 0xA5)
-    {
-
-    }
-
-    if (lcd_dev.index < LCD_BUF_LEN)
-        lcd_dev.index++;
-}
-
 void vTaskLcdBuf(void *pvParameters)
 {
     char ch;
+    uint16_t button;
+    char s[20];
+    char b1[2] = { 0x00, 0x00 };
 
     for(;;)
     {
         if (xQueueReceive(fdLcdBuf, &ch, portMAX_DELAY) == pdPASS)
         {
-            LcdUartHandler(ch);
+            if (DwinGetCharHandler(ch) == true)
+            {
+                // USART_ITConfig(UART5, USART_IT_RXNE, DISABLE);
+            }
         }
+
+        
+    }
+}
+
+void vTaskLcdButton(void *pvParameters)
+{
+    char ch;
+    uint16_t button;
+    char s[20];
+    char b1[4] = { 0x00, 0x00 , 0x00, 0x00 };
+// Switch page 5A A5 07 82 0084 5A01 0001
+
+    for(;;)
+    {
+        if (DwinIsPushButton(&button))
+        {
+            if((button & 0xff) == 0)
+            {
+                b1[0] = 0;
+                b1[1] = 0;
+                LcdWrite(0x1001, b1, 2);
+            }
+            if((button & 0xff) == 1)
+            {
+                b1[0] = 0;
+                b1[1] = 0;
+                LcdWrite(0x1000, b1, 2);
+            }
+            if((button & 0xff) == 2)
+            {
+                b1[0] = 0x5A;
+                b1[1] = 0x01;
+                b1[2] = 0x00;
+                b1[3] = 0x01;
+                LcdWrite(0x0084, b1, 4);
+            }
+            sprintf(s, "\rPush button %d\r\n", button & 0xff);
+            PRINT_OS(s);
+            DwinHandleButton(button);
+            // USART_ITConfig(UART5, USART_IT_RXNE, ENABLE);
+        }
+        vTaskDelay(100);
     }
 }
 
@@ -150,7 +192,7 @@ static void LcdUartInit(void)
     USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
     USART_Init(UART5, &USART_InitStructure);
 
-    USART_ITConfig(UART5, USART_IT_RXNE, DISABLE);
+    USART_ITConfig(UART5, USART_IT_RXNE, ENABLE);
 
     NVIC_InitStructure.NVIC_IRQChannel = UART5_IRQn;
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = configLIBRARY_LOWEST_INTERRUPT_PRIORITY;
@@ -161,20 +203,15 @@ static void LcdUartInit(void)
     USART_Cmd(UART5, ENABLE);
 }
 
-char b[2];
-
 void UART5InterruptHandler(void)
 {
     if(USART_GetITStatus(UART5, USART_IT_RXNE) != RESET)
     {
-        portBASE_TYPE res;
         char ch;
 
         ch = (char)USART_ReceiveData(UART5);
         USART_ClearITPendingBit(UART5, USART_IT_RXNE);
 
-        lcd_dev.buf
-
-        xQueueSendFromISR(fdLcdBuf, &ch, &res);
+        xQueueSendFromISR(fdLcdBuf, &ch, NULL);
     }
 }

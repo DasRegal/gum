@@ -69,6 +69,7 @@ SRCS = 	./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
 	./src/cctalk/cctalk.c \
 	./src/cctalk/coinbox.c \
 	./src/lcd/lcd.c \
+	./src/lcd/dwin.c \
 	./main.c
 
 OBJS=$(SRCS:.c=.o)

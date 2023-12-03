@@ -10,6 +10,7 @@
 #include "mdb.h"
 #include "coinbox.h"
 #include "cashless.h"
+#include "dwin.h"
 
 extern void UsartDebugSendString(const char *pucBuffer);
 
@@ -171,6 +172,7 @@ char console_func_cmd(unsigned char args, void* argv);
 char mdb_func_cmd(unsigned char args, void* argv);
 char cctalk_func_cmd(unsigned char args, void* argv);
 char cashless_func_cmd(unsigned char args, void* argv);
+char dwin_func_cmd(unsigned char args, void* argv);
 
 typedef char (*cb_t)(unsigned char args, void* argv);
 typedef struct
@@ -186,6 +188,7 @@ rcli_cmd_t rcli_commands[] =
     { 1, (char*[]){ "cctalk", NULL }, cctalk_func_cmd },
     { 3, (char*[]){ "cmd", "ddd", "q", NULL }, cmd_func_cmd },
     { 1, (char*[]){ "console", NULL}, console_func_cmd },
+    { 1, (char*[]){ "dwin", NULL}, dwin_func_cmd },
     { 1, (char*[]){ "echo", NULL}, echo_func_cmd },
     { 1, (char*[]){ "mdb", NULL}, mdb_func_cmd },
     { 3, (char*[]){ "status", "set", "get", NULL}, status_func_cmd },
@@ -202,6 +205,31 @@ char help_func_cmd(unsigned char args, void* argv)
         sprintf(rcli_out_buf, "  %s\r\n", (char*)rcli_commands[i].argv[0]);
         RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
     }
+    return 0;
+}
+
+char dwin_func_cmd(unsigned char args, void* argv)
+{
+    char * help_str = 
+"Usage: dwin <command>\r\n\r\n";
+    char * help_str1 = 
+"set page <n page>\t\tSet n page\r\n";
+
+    char page = 0;
+
+    if (args != 4)
+    {
+        sprintf(rcli_out_buf, "%s", help_str);
+        RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+        sprintf(rcli_out_buf, "%s", help_str1);
+        RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+        return 0;
+    }
+
+    page = (uint16_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * 3, NULL, 10);
+
+    DwinSetPage(page);
+
     return 0;
 }
 

@@ -9,7 +9,6 @@
 #include "timers.h"
 
 #include "main.h"
-#include "src/console/console.h"
 #include "src/hw_rev_adc/hw_rev_adc.h"
 #include "src/hw_voltage_adc/hw_voltage_adc.h"
 #include "src/hw_adc.h"
