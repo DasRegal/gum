@@ -15,6 +15,7 @@
 #include "src/mdb/cashless.h"
 #include "src/cctalk/coinbox.h"
 #include "src/lcd/lcd.h"
+#include "src/satellite/satellite.h"
 
 SemaphoreHandle_t semTickPulse;
 static void PrintBanner(void);
@@ -45,6 +46,7 @@ void main()
     ConsoleCliStart();
 
     CoinBoxInit();
+    SatInit();
 
     xTaskCreate(
         vTaskCode,
