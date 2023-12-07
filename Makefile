@@ -39,6 +39,7 @@ INCLUDE = -I./ \
 	  -I./src/hw_voltage_adc \
 	  -I./src/mdb \
 	  -I./src/lcd \
+	  -I /src/flow \
 	  -I./src/cctalk
 
 SRCS = 	./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
@@ -70,6 +71,7 @@ SRCS = 	./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
 	./src/cctalk/coinbox.c \
 	./src/lcd/lcd.c \
 	./src/lcd/dwin.c \
+	./src/flow/flow.c \
 	./main.c
 
 OBJS=$(SRCS:.c=.o)
@@ -88,7 +90,7 @@ cleanall:
 	-find . -name '*.map' -exec rm {} \;
 
 clean:
-	rm -fv ./*.o ./src/*.o ./src/console/*.o ./src/console/rcli/*.o ./src/mdb/*.o ./src/cctalk/*.o
+	rm -fv ./*.o ./src/*.o ./src/console/*.o ./src/console/rcli/*.o ./src/mdb/*.o ./src/cctalk/*.o ./src/flow/*.o
 	rm -fv ./output/*.elf
 	rm -fv ./output/*.lst
 	rm -fv ./output/*.out
