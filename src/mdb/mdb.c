@@ -261,7 +261,7 @@ void MdbInit(mdv_dev_init_struct_t dev_struct)
     mdb_dev.select_item_cb  = dev_struct.select_item_cb;
     mdb_dev.session_cancel_cb = dev_struct.session_cancel_cb;
     mdb_dev.rx_len          = 0;
-    mdb_dev.level           = MDB_LEVEL_2;
+    mdb_dev.level           = MDB_LEVEL_3;
     mdb_dev.state           = MDB_STATE_INACTIVE;
     mdb_dev.addr            = MDB_CASHLESS_DEV_1_ADDR;
     mdb_dev.dev_slave.max_resp_time = 0xFF;
@@ -485,7 +485,7 @@ static mdb_ret_resp_t MdbParseData(uint8_t len)
                 if(mdb_dev.send_cmd == MDB_READER_CMD_E)
                 {
                     if(mdb_dev.send_subcmd == MDB_READER_ENABLE_SUBCMD)
-                        mdb_dev.state = MDB_STATE_ENABLED;
+                        mdb_dev.state = MDB_STATE_SESSION_IDLE;
 
                     if(mdb_dev.send_subcmd == MDB_READER_DISABLE_SUBCMD)
                         mdb_dev.state = MDB_STATE_DISABLED;
@@ -593,7 +593,7 @@ static mdb_ret_resp_t MdbParseResponse(void)
         /* Resp & POLL */
         case MDB_POLL_END_SESSION_RESP:
             {
-                mdb_dev.state = MDB_STATE_ENABLED;
+                mdb_dev.state = MDB_STATE_SESSION_IDLE;
                 //TODO
                 // Check max non-response time!
                 return MDB_RET_END_SESSION;

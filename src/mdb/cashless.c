@@ -100,8 +100,8 @@ cashless_state_t cashless_machine_state[CL_ST_LAST_E][CL_ACT_LAST_E] =
     { CL_ST_SETUP_CONF_E,   CL_ST_PRICES_E,     CL_ST_POLL_E,       CL_ST_POLL_E,           CL_ST_SES_CMPL,         CL_ST_POLL_E,           CL_ST_SES_CMPL,        CL_ST_POLL_E,           CL_ST_POLL_E,           CL_ST_POLL_E           }, /* CL_ST_POLL_E           12H POLL */
     { CL_ST_POLL_E,         CL_ST_POLL_E,       CL_ST_POLL_E,       CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_SETUP_CONF_E     }, /* CL_ST_SETUP_CONF_E     11 00H SETUP CONF */
     { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_RESET_E,          CL_ST_EXP_REQUEST_ID_E, CL_ST_PRICES_E         }, /* CL_ST_PRICES_E         11 01H SETUP PRICES */
-    { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_ENABLE_E,     CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_EXP_REQUEST_ID_E }, /* CL_ST_EXP_REQUEST_ID_E 17 00H EXP REQUEST ID */
-    { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_RESET_E,          CL_ST_EXP_PRICE_E,      CL_ST_EXP_OPT_E        }, /* CL_ST_EXP_OPT_E        17 04H EXP OPT */
+    { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_EXP_OPT_E,    CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_EXP_REQUEST_ID_E }, /* CL_ST_EXP_REQUEST_ID_E 17 00H EXP REQUEST ID */
+    { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_RESET_E,          CL_ST_ENABLE_E,         CL_ST_EXP_OPT_E        }, /* CL_ST_EXP_OPT_E        17 04H EXP OPT */
     { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_EXP_PRICE_E      }, /* CL_ST_EXP_PRICE_E      11 01H SETUP PRICES */
     { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_ENABLE_E         }, /* CL_ST_ENABLE_E         14 01H ENABLE */
     { CL_ST_RESET_E,        CL_ST_RESET_E,      CL_ST_RESET_E,      CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,          CL_ST_RESET_E,         CL_ST_RESET_E,          CL_ST_POLL_E,           CL_ST_DISABLE_E        }, /* CL_ST_DISABLE_E        14 00H DISABLE */
@@ -502,7 +502,10 @@ static void CashlessStateExpRequestId(void)
 
 static void CashlessStateExpOpt(void)
 {
-
+    /* Always Idle */
+    uint8_t buf[4] = {0, 0, 0, 0};
+    buf[3] = 0b00100000;
+    MdbSendCommand(MDB_EXPANSION_CMD_E, MDB_EXP_OPT_FTR_EN_SUBCMD, buf);
 }
 
 static void CashlessStateExpPrices(void)
@@ -862,13 +865,11 @@ void vTimerTRespCb( TimerHandle_t xTimer )
 void vTimerProductSelectionTimeoutCb( TimerHandle_t xTimer )
 {
     xTimerStop(xProductSelectionTimer, 0);
-    cashless_dev.isProductSelectionTimeout = true;
 }
 
 void vTimerCardReadTimeoutCb( TimerHandle_t xTimer )
 {
     xTimerStop(xCardReadTimer, 0);
-    cashless_dev.isCardReadTimeout = true;
 }
 
 uint8_t isTimerStart = 0;
