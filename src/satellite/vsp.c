@@ -1,70 +1,232 @@
 #include "vsp.h"
 vsp_dev_t vsp_dev;
 
-static void VspLatchOut(bool enable);
-static void VspLatchIn(bool enable);
-static void VspCs1(bool enable);
-static void VspCs2(bool enable);
-static void VspCs3(bool enable);
-static void VspCs4(bool enable);
+// static void VspLatchOut(bool enable);
+// static void VspLatchIn(bool enable);
+static void VspCs(uint8_t idx, bool enable);
+// static void VspClk(bool enable);
+// static void VspClk(bool enable);
 
 void VspInit(vsp_dev_t dev_struct)
 {
-    vsp_dev.cb_latch_out = dev_struct.cb_latch_out;
-    vsp_dev.cb_latch_in  = dev_struct.cb_latch_in;
-    vsp_dev.cb_cs1       = dev_struct.cb_cs1;
-    vsp_dev.cb_cs2       = dev_struct.cb_cs2;
-    vsp_dev.cb_cs3       = dev_struct.cb_cs3;
-    vsp_dev.cb_cs4       = dev_struct.cb_cs4;
+    vsp_dev.cb_latch_out    = dev_struct.cb_latch_out;
+    vsp_dev.cb_latch_in     = dev_struct.cb_latch_in;
+    vsp_dev.cb_clk          = dev_struct.cb_clk;
+    vsp_dev.item[0].cb_cs   = dev_struct.item[0].cb_cs;
+    vsp_dev.item[1].cb_cs   = dev_struct.item[1].cb_cs;
+    vsp_dev.item[2].cb_cs   = dev_struct.item[2].cb_cs;
+    vsp_dev.item[3].cb_cs   = dev_struct.item[3].cb_cs;
+    vsp_dev.cb_sat_sens     = dev_struct.cb_sat_sens;
+    vsp_dev.cb_sat_button   = dev_struct.cb_sat_button;
 
     for (size_t i = 0; i < VSP_MAX_ITEMS; i++)
-        vsp_dev.item[i].is_enable = false;
+    {
+        vsp_dev.item[i].is_enable   = true;
+        vsp_dev.item[i].block       = false;
+        vsp_dev.item[i].is_select   = false;
+        vsp_dev.item[i].state.inhibit = false;
+        vsp_dev.item[i].state.led   = false;
+        vsp_dev.item[i].state.motor = false;
+    }
 }
 
-static void VspLatchOut(bool enable)
+// static void VspLatchOut(bool enable)
+// {
+//     if (vsp_dev.cb_latch_out == NULL)
+//         return;
+
+//     vsp_dev.cb_latch_out(enable);
+// }
+
+// static void VspLatchIn(bool enable)
+// {
+//     if (vsp_dev.cb_latch_in == NULL)
+//         return;
+
+//     vsp_dev.cb_latch_in(enable);
+// }
+
+static void VspCs(uint8_t idx, bool enable)
 {
-    if (vsp_dev.cb_latch_out == NULL)
+    if (idx >= VSP_MAX_ITEMS)
+        return;
+    if (vsp_dev.item[idx].cb_cs == NULL)
         return;
 
-    vsp_dev.cb_latch_out(enable);
+    vsp_dev.item[idx].cb_cs(enable);
 }
 
-static void VspLatchIn(bool enable)
+// static void VspClk(bool enable)
+// {
+//     if (vsp_dev.cb_clk == NULL)
+//         return;
+
+//     vsp_dev.cb_clk(enable);
+// }
+
+void VspEnable(uint8_t idx, bool enable)
 {
-    if (vsp_dev.cb_latch_in == NULL)
+    if (idx >= VSP_MAX_ITEMS)
         return;
 
-    vsp_dev.cb_latch_in(enable);
+    vsp_dev.item[idx].is_enable = enable;
 }
 
-static void VspCs1(bool enable)
+bool VspIsEnable(uint8_t idx)
 {
-    if (vsp_dev.cb_cs1 == NULL)
-        return;
+    if (idx >= VSP_MAX_ITEMS)
+        return false;
 
-    vsp_dev.cb_cs1(enable);
+    return vsp_dev.item[idx].is_enable;
 }
 
-static void VspCs2(bool enable)
+void VspBlock(uint8_t idx, bool enable)
 {
-    if (vsp_dev.cb_cs2 == NULL)
+    if (idx >= VSP_MAX_ITEMS)
         return;
 
-    vsp_dev.cb_cs2(enable);
+    VspMotorCtrl(idx, false);
+    VspLedCtrl(idx, false);
+    vsp_dev.item[idx].block = enable;
 }
 
-static void VspCs3(bool enable)
+bool VspIsBlock(uint8_t idx)
 {
-    if (vsp_dev.cb_cs3 == NULL)
-        return;
+    if (idx >= VSP_MAX_ITEMS)
+        return false;
 
-    vsp_dev.cb_cs3(enable);
+    return vsp_dev.item[idx].block;
 }
 
-static void VspCs4(bool enable)
+void VspMotorCtrl(uint8_t idx, bool enable)
 {
-    if (vsp_dev.cb_cs4 == NULL)
+    if (true == VspIsBlock(idx))
         return;
 
-    vsp_dev.cb_cs4(enable);
+    if (false == VspIsEnable(idx))
+        return;
+
+    vsp_dev.item[idx].state.motor = enable;
+    vsp_dev.cb_latch_in(vsp_dev.item[idx].state.motor);
+    vsp_dev.cb_latch_out(vsp_dev.item[idx].state.led);
+    vsp_dev.cb_clk(vsp_dev.item[idx].state.inhibit);
+    // VspLatchIn(vsp_dev.item[idx].state.motor);
+    // VspLatchOut(vsp_dev.item[idx].state.led);
+    // VspClk(vsp_dev.item[idx].state.inhibit);
+    VspCs(idx, true);
+    VspCs(idx, false);
+}
+
+void VspLedCtrl(uint8_t idx, bool enable)
+{
+    if (true == VspIsBlock(idx))
+        return;
+
+    if (false == VspIsEnable(idx))
+        return;
+
+    vsp_dev.item[idx].state.led = enable;
+    vsp_dev.cb_latch_in(vsp_dev.item[idx].state.motor);
+    vsp_dev.cb_latch_out(vsp_dev.item[idx].state.led);
+    vsp_dev.cb_clk(vsp_dev.item[idx].state.inhibit);
+
+    // VspLatchOut(enable);
+    VspCs(idx, true);
+    VspCs(idx, false);
+}
+
+void VspInhibitCtrl(uint8_t idx, bool enable)
+{
+    if (idx >= VSP_MAX_ITEMS)
+        return;
+
+    if (false == VspIsEnable(idx))
+        return;
+
+    vsp_dev.item[idx].state.inhibit = enable;
+    vsp_dev.cb_latch_in(vsp_dev.item[idx].state.motor);
+    vsp_dev.cb_latch_out(vsp_dev.item[idx].state.led);
+    vsp_dev.cb_clk(vsp_dev.item[idx].state.inhibit);
+
+    VspCs(idx, true);
+    // VspClk(enable);
+    // VspCs(idx, false);
+}
+
+bool VspCheck(uint8_t idx)
+{
+    bool ret = false;
+
+    if (VspIsBlock(idx) == true)
+        return false;
+
+    vsp_dev.cb_latch_in(vsp_dev.item[idx].state.motor);
+    vsp_dev.cb_latch_out(vsp_dev.item[idx].state.led);
+    vsp_dev.cb_clk(vsp_dev.item[idx].state.inhibit);
+
+    VspCs(idx, true);
+    ret = vsp_dev.cb_sat_sens();
+    VspCs(idx, false); 
+
+    VspEnable(idx, ret);
+
+    return ret;  
+}
+
+bool VspButton(uint8_t idx)
+{
+    bool ret = false;
+    
+    if (true == VspIsBlock(idx))
+        return false;
+
+    if (false == VspIsEnable(idx))
+        return false;
+
+    vsp_dev.cb_latch_in(vsp_dev.item[idx].state.motor);
+    vsp_dev.cb_latch_out(vsp_dev.item[idx].state.led);
+    vsp_dev.cb_clk(vsp_dev.item[idx].state.inhibit);
+
+    VspCs(idx, true);
+    ret = vsp_dev.cb_sat_button();
+    VspCs(idx, false);
+
+    return ret;
+}
+
+void VspSelectItem(uint8_t idx)
+{
+    if (false == VspIsEnable(idx))
+        return;
+
+    for (size_t i = 0; i < VSP_MAX_ITEMS; i++)
+    {
+        VspLedCtrl(i, (i == idx) ? true : false);
+    }
+
+    vsp_dev.item[idx].is_select = true;
+}
+
+void VspDeselectItem(uint8_t idx)
+{
+    if (false == VspIsEnable(idx))
+        return;
+
+    for (size_t i = 0; i < VSP_MAX_ITEMS; i++)
+    {
+        VspLedCtrl(i, false);
+    }
+
+    vsp_dev.item[idx].is_select = false;
+}
+
+uint8_t VspGetSelectItem(void)
+{
+    for (size_t i = 0; i < VSP_MAX_ITEMS; i++)
+    {
+        if (vsp_dev.item[i].is_select)
+            return i;
+    }
+
+    return VSP_MAX_ITEMS;
 }

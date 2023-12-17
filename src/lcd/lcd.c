@@ -23,7 +23,7 @@ void vTaskLcdButton(void *pvParameters);
 
 static void LcdUartInit(void);
 static void LcdSendString(const char *pucBuffer, uint8_t len);
-
+extern EventGroupHandle_t  xLcdButtonEventGroup;
 
 char lcdBuf[LCD_BUF_LEN];
 
@@ -71,29 +71,48 @@ void vTaskLcdButton(void *pvParameters)
     char s[20];
     char b1[4] = { 0x00, 0x00 , 0x00, 0x00 };
     DwinReset();
-    vTaskDelay(50);
+    vTaskDelay(1000);
+    DwinSetPage(1);
+    // vTaskDelay(500);
     for(;;)
     {
         if (DwinIsPushButton(&button))
         {
             if((button & 0xff) == 0)
             {
-                DwinButtonEn(0x1002, true);
+                xEventGroupSetBits(xLcdButtonEventGroup, (1 << 0));
+                DwinSetPage(3);
+                // DwinButtonEn(0x1002, true);
             }
             if((button & 0xff) == 1)
             {
-                DwinButtonEn(0x1002, false);
+                xEventGroupSetBits(xLcdButtonEventGroup, (1 << 1));
+                DwinSetPage(3);
+                // DwinButtonEn(0x1002, false);
             }
+
             if((button & 0xff) == 2)
             {
-                b1[0] = 0x5A;
-                b1[1] = 0x01;
-                b1[2] = 0x00;
-                b1[3] = 0x01;
-                LcdWrite(0x0084, b1, 4);
+                xEventGroupSetBits(xLcdButtonEventGroup, (1 << 2));
+                DwinSetPage(3);
+                // DwinButtonEn(0x1002, true);
             }
-            sprintf(s, "\rPush button %d\r\n", button & 0xff);
-            PRINT_OS(s);
+            if((button & 0xff) == 3)
+            {
+                xEventGroupSetBits(xLcdButtonEventGroup, (1 << 3));
+                DwinSetPage(3);
+                // DwinButtonEn(0x1002, false);
+            }
+            // if((button & 0xff) == 2)
+            // {
+            //     b1[0] = 0x5A;
+            //     b1[1] = 0x01;
+            //     b1[2] = 0x00;
+            //     b1[3] = 0x01;
+            //     LcdWrite(0x0084, b1, 4);
+            // }
+            // sprintf(s, "\rPush button %d\r\n", button & 0xff);
+            // PRINT_OS(s);
             DwinHandleButton(button);
         }
         vTaskDelay(100);

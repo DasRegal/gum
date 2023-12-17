@@ -1,8 +1,16 @@
 #include "stm32f10x.h"
 
+#include "FreeRTOS.h"
+#include "event_groups.h"
+#include "task.h"
+#include "timers.h"
+#include "semphr.h"
+
 #include "main.h"
 #include "vsp.h"
 #include "satellite.h"
+#include "lcd.h"
+#include "dwin.h"
 
 /* Latch In */
 #define SAT_LATCH_IN_PIN    GPIO_Pin_4
@@ -32,6 +40,10 @@
 #define SAT_INT_PIN         GPIO_Pin_3
 #define SAT_INT_PORT        GPIOB
 #define SAT_INT_RCC         RCC_APB2Periph_GPIOB
+#define SAT_INT_PORT_SRC    GPIO_PortSourceGPIOB
+#define SAT_INT_PIN_SRC     GPIO_PinSource3
+#define SAT_INT_EXTI_LINE   EXTI_Line3
+#define SAT_INT_EXTI_IRQN   EXTI3_IRQn
 /* BUT */
 #define SAT_BUT_PIN         GPIO_Pin_5
 #define SAT_BUT_PORT        GPIOB
@@ -45,9 +57,14 @@
 #define SAT_MOSI_PORT       GPIOB
 #define SAT_MOSI_RCC        RCC_APB2Periph_GPIOB
 /* CLK */
-#define SAT_CLK_PIN         GPIO_Pin_12
+#define SAT_CLK_PIN         GPIO_Pin_13
 #define SAT_CLK_PORT        GPIOB
 #define SAT_CLK_RCC         RCC_APB2Periph_GPIOB
+
+SemaphoreHandle_t   sat_block_poll_sem;
+TaskHandle_t        ledstream_handler;
+SemaphoreHandle_t   xItemMutex;
+EventGroupHandle_t  xLcdButtonEventGroup;
 
 static void SatLatchOut(bool enable);
 static void SatLatchIn(bool enable);
@@ -55,7 +72,13 @@ static void SatCs1(bool enable);
 static void SatCs2(bool enable);
 static void SatCs3(bool enable);
 static void SatCs4(bool enable);
+static void SatClk(bool enable);
 static void SatInitPeriph(void);
+static bool SatSens(void);
+static bool SatButton(void);
+
+void vTaskSatellitePoll (void *pvParameters);
+void vTaskLedStream (void *pvParameters);
 
 void SatInit(void)
 {
@@ -63,13 +86,232 @@ void SatInit(void)
 
     vsp_dev.cb_latch_out    = SatLatchOut;
     vsp_dev.cb_latch_in     = SatLatchIn;
-    vsp_dev.cb_cs1          = SatCs1;
-    vsp_dev.cb_cs2          = SatCs2;
-    vsp_dev.cb_cs3          = SatCs3;
-    vsp_dev.cb_cs4          = SatCs4;
+    vsp_dev.item[0].cb_cs   = SatCs1;
+    vsp_dev.item[1].cb_cs   = SatCs2;
+    vsp_dev.item[2].cb_cs   = SatCs3;
+    vsp_dev.item[3].cb_cs   = SatCs4;
+    vsp_dev.cb_clk          = SatClk;
+    vsp_dev.cb_sat_sens     = SatSens;
+    vsp_dev.cb_sat_button   = SatButton;
 
-    SatInitPeriph();
     VspInit(vsp_dev);
+    SatInitPeriph();
+
+    vSemaphoreCreateBinary(sat_block_poll_sem);
+    xSemaphoreGive(sat_block_poll_sem);
+    xItemMutex = xSemaphoreCreateMutex();
+    xLcdButtonEventGroup = xEventGroupCreate();
+
+    xTaskCreate(
+        vTaskSatellitePoll,
+        "Satellite",
+        256,
+        (void*)NULL,
+        tskIDLE_PRIORITY + 2,
+        NULL
+    );
+
+    xTaskCreate(
+        vTaskLedStream,
+        "LedStream",
+        256,
+        (void*)NULL,
+        tskIDLE_PRIORITY + 2,
+        &ledstream_handler
+    );
+}
+
+void vTaskSatellitePoll (void *pvParameters)
+{
+    SatCs1(false);
+    SatCs2(false);
+    SatCs3(false);
+    SatCs4(false);
+    VspEnable(0, true);
+    VspEnable(1, true);
+    VspEnable(2, true);
+    VspEnable(3, true);
+    EventBits_t flags;
+    // VspBlock(3, true);
+    for( ;; )
+    {
+        // xSemaphoreTake(sat_block_poll_sem, portMAX_DELAY);
+        if (xSemaphoreTake(sat_block_poll_sem, 5000) == pdPASS)
+        {
+            uint8_t item = VspGetSelectItem();
+            if(item < VSP_MAX_ITEMS)
+            {
+                DwinSetPage(1);
+
+                xSemaphoreTake(xItemMutex, portMAX_DELAY);
+                VspMotorCtrl(item, false);
+
+                VspInhibitCtrl(item, false);
+                for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
+                {
+                    VspDeselectItem(idx);
+                }
+                xSemaphoreGive(xItemMutex);
+                vTaskResume(ledstream_handler);
+            }
+
+            for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
+            {
+                xSemaphoreTake(xItemMutex, portMAX_DELAY);
+                VspCheck(idx);
+                xSemaphoreGive(xItemMutex);
+            }
+
+            /* Start from buttons */
+            for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
+            {
+                xSemaphoreTake(xItemMutex, portMAX_DELAY);
+                bool is_push = VspButton(idx);
+                xSemaphoreGive(xItemMutex);
+                if (is_push)
+                {
+                    vTaskSuspend(ledstream_handler);
+                    VspSelectItem(idx);
+
+                    xSemaphoreTake(xItemMutex, portMAX_DELAY);
+                    VspInhibitCtrl(idx, true);
+                    VspMotorCtrl(idx, true);
+                    xSemaphoreGive(xItemMutex);
+
+                    break;
+                }
+            }
+
+            /* Start from LCD buttons */
+            flags = xEventGroupGetBits(xLcdButtonEventGroup);
+            if (flags)
+            {
+                for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
+                {
+                    if ( flags & (1 << idx))
+                    {
+                        xEventGroupClearBits(xLcdButtonEventGroup, (1 << idx));
+                        vTaskSuspend(ledstream_handler);
+                        VspSelectItem(idx);
+
+                        xSemaphoreTake(xItemMutex, portMAX_DELAY);
+                        VspInhibitCtrl(idx, true);
+                        VspMotorCtrl(idx, true);
+                        xSemaphoreGive(xItemMutex);
+
+                    break;
+                    }
+                }
+            }
+
+
+            /* If pushed the button */
+            if(VspGetSelectItem() < VSP_MAX_ITEMS)
+                continue;
+
+            vTaskDelay(100);
+            xSemaphoreGive(sat_block_poll_sem);
+        }
+        else
+        {
+            // uint8_t item = VspGetSelectItem();
+            // xSemaphoreTake(xItemMutex, portMAX_DELAY);
+            // VspInhibitCtrl(item, false);
+            // SatContinuePoll();
+            // xSemaphoreGive(xItemMutex);
+            // vTaskResume(ledstream_handler);
+
+            DwinSetPage(1);
+
+            xSemaphoreTake(xItemMutex, portMAX_DELAY);
+            uint8_t item = VspGetSelectItem();
+            VspMotorCtrl(item, false);
+
+            VspInhibitCtrl(item, false);
+            for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
+            {
+                VspDeselectItem(idx);
+            }
+            xSemaphoreGive(xItemMutex);
+            vTaskResume(ledstream_handler);
+            
+            xSemaphoreGive(sat_block_poll_sem);
+        }
+
+    }
+}
+
+void vTaskLedStream (void *pvParameters)
+{
+    #define SAT_LEDSTREAM_SPEED_1 80
+    #define SAT_LEDSTREAM_SPEED_2 720
+    for ( ;; )
+    {
+        xSemaphoreTake(xItemMutex, portMAX_DELAY);
+        VspLedCtrl(0, true);
+        xSemaphoreGive(xItemMutex);
+
+        vTaskDelay(SAT_LEDSTREAM_SPEED_1);
+
+        xSemaphoreTake(xItemMutex, portMAX_DELAY);
+        VspLedCtrl(3, false);
+        xSemaphoreGive(xItemMutex);
+
+        vTaskDelay(SAT_LEDSTREAM_SPEED_2);
+
+        xSemaphoreTake(xItemMutex, portMAX_DELAY);
+        VspLedCtrl(1, true);
+        xSemaphoreGive(xItemMutex);
+
+        vTaskDelay(SAT_LEDSTREAM_SPEED_1);
+
+        xSemaphoreTake(xItemMutex, portMAX_DELAY);
+        VspLedCtrl(0, false);
+        xSemaphoreGive(xItemMutex);
+
+        vTaskDelay(SAT_LEDSTREAM_SPEED_2);
+
+        xSemaphoreTake(xItemMutex, portMAX_DELAY);
+        VspLedCtrl(2, true);
+        xSemaphoreGive(xItemMutex);
+
+        vTaskDelay(SAT_LEDSTREAM_SPEED_1);
+
+        xSemaphoreTake(xItemMutex, portMAX_DELAY);
+        VspLedCtrl(1, false);
+        xSemaphoreGive(xItemMutex);
+
+        vTaskDelay(SAT_LEDSTREAM_SPEED_2);
+
+        xSemaphoreTake(xItemMutex, portMAX_DELAY);
+        VspLedCtrl(3, true);
+        xSemaphoreGive(xItemMutex);
+
+        vTaskDelay(SAT_LEDSTREAM_SPEED_1);
+
+        xSemaphoreTake(xItemMutex, portMAX_DELAY);
+        VspLedCtrl(2, false);
+        xSemaphoreGive(xItemMutex);
+
+        vTaskDelay(SAT_LEDSTREAM_SPEED_2);
+    }
+}
+
+void SatContinuePoll(void)
+{
+    // // if(VspGetSelectItem() == VSP_MAX_ITEMS)
+    // //     return;
+
+    // for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
+    // {
+    //     VspDeselectItem(idx);
+    // }
+    // xSemaphoreGive(sat_block_poll_sem);
+}
+
+uint8_t SatGetPushButton(void)
+{
+    return VspGetSelectItem();
 }
 
 static void SatInitPeriph(void)
@@ -104,7 +346,7 @@ static void SatInitPeriph(void)
                             SAT_BUT_RCC, ENABLE);
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
 
-    GPIO_PinRemapConfig(GPIO_Remap_SWJ_NoJTRST, ENABLE);
+    GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);
 
     /* Latch IN */
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
@@ -117,19 +359,19 @@ static void SatInitPeriph(void)
     GPIO_InitStructure.GPIO_Pin = SAT_LATCH_OUT_PIN;
     GPIO_Init(SAT_LATCH_OUT_PORT, &GPIO_InitStructure);
     SatLatchIn(false);
-    SatLatchOut(false);
+    SatLatchOut(true);
     /* CLK */
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
-    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
+    // GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
     GPIO_InitStructure.GPIO_Pin = SAT_CLK_PIN;
     GPIO_Init(SAT_CLK_PORT, &GPIO_InitStructure);
     /* MISO */
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
     GPIO_InitStructure.GPIO_Pin = SAT_MISO_PIN;
     GPIO_Init(SAT_MISO_PORT, &GPIO_InitStructure);
-    /* MISO */
-    /* GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP; */
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
+    /* MOSI */
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
     GPIO_InitStructure.GPIO_Pin = SAT_MOSI_PIN;
     GPIO_Init(SAT_MOSI_PORT, &GPIO_InitStructure);
     /* CS1 */
@@ -149,15 +391,45 @@ static void SatInitPeriph(void)
     GPIO_InitStructure.GPIO_Pin = SAT_CS4_PIN;
     GPIO_Init(SAT_CS4_PORT, &GPIO_InitStructure);
 
-    SatCs1(true);
-    SatCs2(true);
-    SatCs3(true);
-    SatCs4(true);
+    GPIO_SetBits(SAT_CS1_PORT, SAT_CS1_PIN);
+    GPIO_SetBits(SAT_CS2_PORT, SAT_CS2_PIN);
+    GPIO_SetBits(SAT_CS3_PORT, SAT_CS3_PIN);
+    GPIO_SetBits(SAT_CS4_PORT, SAT_CS4_PIN);
+
+    /* BUTTON */
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
+    GPIO_InitStructure.GPIO_Pin = SAT_BUT_PIN;
+    GPIO_Init(SAT_BUT_PORT, &GPIO_InitStructure);
+    /* INT */
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+    GPIO_InitStructure.GPIO_Pin = SAT_INT_PIN;
+    GPIO_Init(SAT_INT_PORT, &GPIO_InitStructure);
+
+    GPIO_SetBits(SAT_CS1_PORT, SAT_CS1_PIN);
+    GPIO_SetBits(SAT_CS2_PORT, SAT_CS2_PIN);
+    GPIO_SetBits(SAT_CS3_PORT, SAT_CS3_PIN);
+    GPIO_SetBits(SAT_CS4_PORT, SAT_CS4_PIN);
 
     // SPI_Init(SPI2, &SPI_InitStructure);
     // SPI_Cmd(SPI2, ENABLE);
 
+    GPIO_EXTILineConfig(SAT_INT_PORT_SRC, SAT_INT_PIN_SRC);
+
     NVIC_Init(&NVIC_InitStructure);
+
+    NVIC_InitStructure.NVIC_IRQChannel                      = SAT_INT_EXTI_IRQN;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority    = 0x0F;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority           = 0x00;
+    NVIC_InitStructure.NVIC_IRQChannelCmd                   = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+
+
+    EXTI_InitTypeDef EXTI_InitStructure;
+    EXTI_InitStructure.EXTI_Mode    = EXTI_Mode_Interrupt;
+    EXTI_InitStructure.EXTI_Line    = SAT_INT_EXTI_LINE;
+    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
+    EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+    EXTI_Init(&EXTI_InitStructure);
 }
 
 static void SatLatchOut(bool enable)
@@ -179,7 +451,10 @@ static void SatLatchIn(bool enable)
 static void SatCs1(bool enable)
 {
     if (enable)
+    {
         GPIO_SetBits(SAT_CS1_PORT, SAT_CS1_PIN);
+        vTaskDelay(1);
+    }
     else
         GPIO_ResetBits(SAT_CS1_PORT, SAT_CS1_PIN);
 }
@@ -187,7 +462,10 @@ static void SatCs1(bool enable)
 static void SatCs2(bool enable)
 {
     if (enable)
+    {
         GPIO_SetBits(SAT_CS2_PORT, SAT_CS2_PIN);
+        vTaskDelay(1);
+    }
     else
         GPIO_ResetBits(SAT_CS2_PORT, SAT_CS2_PIN);
 }
@@ -195,7 +473,10 @@ static void SatCs2(bool enable)
 static void SatCs3(bool enable)
 {
     if (enable)
+    {
         GPIO_SetBits(SAT_CS3_PORT, SAT_CS3_PIN);
+        vTaskDelay(1);
+    }
     else
         GPIO_ResetBits(SAT_CS3_PORT, SAT_CS3_PIN);
 }
@@ -203,7 +484,49 @@ static void SatCs3(bool enable)
 static void SatCs4(bool enable)
 {
     if (enable)
+    {
         GPIO_SetBits(SAT_CS4_PORT, SAT_CS4_PIN);
+        vTaskDelay(1);
+    }
     else
         GPIO_ResetBits(SAT_CS4_PORT, SAT_CS4_PIN);
+}
+
+static void SatClk(bool enable)
+{
+    if (enable)
+        GPIO_SetBits(SAT_CLK_PORT, SAT_CLK_PIN);
+    else
+        GPIO_ResetBits(SAT_CLK_PORT, SAT_CLK_PIN);
+}
+
+static bool SatSens(void)
+{
+    uint8_t stat;
+
+    stat = GPIO_ReadInputDataBit(SAT_MISO_PORT, SAT_MISO_PIN);
+
+    return stat ? false : true;
+}
+
+static bool SatButton(void)
+{
+    uint8_t stat;
+
+    stat = GPIO_ReadInputDataBit(SAT_BUT_PORT, SAT_BUT_PIN);
+
+    return stat ? false : true;
+}
+
+void EXTI3_IRQHandler(void)
+{
+    static  portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
+    
+    if (EXTI_GetITStatus(EXTI_Line3))
+    {
+
+        EXTI_ClearITPendingBit(EXTI_Line3);
+        xSemaphoreGiveFromISR(sat_block_poll_sem, &xHigherPriorityTaskWoken);
+        if(xHigherPriorityTaskWoken == pdTRUE) taskYIELD();
+    }
 }
