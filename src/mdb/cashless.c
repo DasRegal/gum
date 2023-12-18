@@ -620,13 +620,13 @@ static void CashlessStateVendDenied(void)
 
 uint8_t CashlessVendSuccessCmd(uint16_t item)
 {
-    if (cashless_dev.vendStat == CL_VEND_APPROVED)
-    {
+    // if (cashless_dev.vendStat == CL_VEND_APPROVED)
+    // {
         cashless_dev.isVendSuccess = true;
         return 0;
-    }
+    // }
 
-    return 1;
+    // return 1;
 }
 
 uint8_t CashlessVendFailureCmd(void)
@@ -808,6 +808,16 @@ uint8_t CashlessVendRequest(uint16_t price, uint16_t item)
     cashless_dev.item  = item;
     cashless_dev.isVendRequest = true;
     return 0;
+}
+
+bool CashlessIsVendApproved(uint16_t *item)
+{
+    if (cashless_dev.vendStat == CL_VEND_APPROVED)
+    {
+        cashless_dev.vendStat = CL_VEND_WAIT;
+        return true;
+    }
+    return false;
 }
 
 /* =======================================*/

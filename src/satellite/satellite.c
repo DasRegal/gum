@@ -9,7 +9,6 @@
 #include "main.h"
 #include "vsp.h"
 #include "satellite.h"
-#include "lcd.h"
 #include "dwin.h"
 
 /* Latch In */
@@ -64,7 +63,10 @@
 SemaphoreHandle_t   sat_block_poll_sem;
 TaskHandle_t        ledstream_handler;
 SemaphoreHandle_t   xItemMutex;
-EventGroupHandle_t  xLcdButtonEventGroup;
+SemaphoreHandle_t   xVendMutex;
+extern EventGroupHandle_t  xLcdButtonEventGroup;
+extern EventGroupHandle_t  xLcdVendItemGroup;
+static uint8_t is_vend;
 
 static void SatLatchOut(bool enable);
 static void SatLatchIn(bool enable);
@@ -82,6 +84,7 @@ void vTaskLedStream (void *pvParameters);
 
 void SatInit(void)
 {
+    is_vend = 0;
     vsp_dev_t vsp_dev;
 
     vsp_dev.cb_latch_out    = SatLatchOut;
@@ -100,7 +103,9 @@ void SatInit(void)
     vSemaphoreCreateBinary(sat_block_poll_sem);
     xSemaphoreGive(sat_block_poll_sem);
     xItemMutex = xSemaphoreCreateMutex();
+    xVendMutex = xSemaphoreCreateMutex();
     xLcdButtonEventGroup = xEventGroupCreate();
+    xLcdVendItemGroup = xEventGroupCreate();
 
     xTaskCreate(
         vTaskSatellitePoll,
@@ -136,29 +141,34 @@ void vTaskSatellitePoll (void *pvParameters)
     for( ;; )
     {
         // xSemaphoreTake(sat_block_poll_sem, portMAX_DELAY);
-        if (xSemaphoreTake(sat_block_poll_sem, 5000) == pdPASS)
+        if (xSemaphoreTake(sat_block_poll_sem, 60000) == pdPASS)
         {
             uint8_t item = VspGetSelectItem();
             if(item < VSP_MAX_ITEMS)
             {
-                DwinSetPage(1);
+                xSemaphoreTake(xVendMutex, portMAX_DELAY);
+                is_vend = 1;
+                xSemaphoreGive(xVendMutex);
+
+                // DwinSetPage(1);
 
                 xSemaphoreTake(xItemMutex, portMAX_DELAY);
-                VspMotorCtrl(item, false);
+                    VspMotorCtrl(item, false);
 
-                VspInhibitCtrl(item, false);
-                for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
-                {
-                    VspDeselectItem(idx);
-                }
+                    VspInhibitCtrl(item, false);
+                    for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
+                    {
+                        VspDeselectItem(idx);
+                    }
                 xSemaphoreGive(xItemMutex);
+
                 vTaskResume(ledstream_handler);
             }
 
             for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
             {
                 xSemaphoreTake(xItemMutex, portMAX_DELAY);
-                VspCheck(idx);
+                    VspCheck(idx);
                 xSemaphoreGive(xItemMutex);
             }
 
@@ -191,13 +201,17 @@ void vTaskSatellitePoll (void *pvParameters)
                     if ( flags & (1 << idx))
                     {
                         xEventGroupClearBits(xLcdButtonEventGroup, (1 << idx));
+                        
                         vTaskSuspend(ledstream_handler);
-                        VspSelectItem(idx);
 
                         xSemaphoreTake(xItemMutex, portMAX_DELAY);
-                        VspInhibitCtrl(idx, true);
-                        VspMotorCtrl(idx, true);
+                            VspSelectItem(idx);
                         xSemaphoreGive(xItemMutex);
+
+                        // xSemaphoreTake(xItemMutex, portMAX_DELAY);
+                        // VspInhibitCtrl(idx, true);
+                        // VspMotorCtrl(idx, true);
+                        // xSemaphoreGive(xItemMutex);
 
                     break;
                     }
@@ -214,6 +228,11 @@ void vTaskSatellitePoll (void *pvParameters)
         }
         else
         {
+            xSemaphoreTake(xVendMutex, portMAX_DELAY);
+                is_vend = 2;
+            xSemaphoreGive(xVendMutex);
+
+
             // uint8_t item = VspGetSelectItem();
             // xSemaphoreTake(xItemMutex, portMAX_DELAY);
             // VspInhibitCtrl(item, false);
@@ -221,24 +240,69 @@ void vTaskSatellitePoll (void *pvParameters)
             // xSemaphoreGive(xItemMutex);
             // vTaskResume(ledstream_handler);
 
-            DwinSetPage(1);
+            // DwinSetPage(1);
 
             xSemaphoreTake(xItemMutex, portMAX_DELAY);
-            uint8_t item = VspGetSelectItem();
-            VspMotorCtrl(item, false);
+                uint8_t item = VspGetSelectItem();
+                VspMotorCtrl(item, false);
 
-            VspInhibitCtrl(item, false);
-            for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
-            {
-                VspDeselectItem(idx);
-            }
+                VspInhibitCtrl(item, false);
+                for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
+                {
+                    VspDeselectItem(idx);
+                }
             xSemaphoreGive(xItemMutex);
+            
             vTaskResume(ledstream_handler);
             
             xSemaphoreGive(sat_block_poll_sem);
         }
 
     }
+}
+
+void SatResume(void)
+{
+    for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
+    {
+        VspDeselectItem(idx);
+    }
+    xSemaphoreGive(xItemMutex);
+    vTaskResume(ledstream_handler);
+    
+    xSemaphoreGive(sat_block_poll_sem);
+}
+
+void SatVend(uint8_t item)
+{
+    EventBits_t flags;
+    flags = xEventGroupGetBits(xLcdVendItemGroup);
+    if (flags)
+    {
+        for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
+        {
+            if ( flags & (1 << idx))
+            {
+                xEventGroupClearBits(xLcdVendItemGroup, (1 << idx));
+                
+                xSemaphoreTake(xItemMutex, portMAX_DELAY);
+                    VspInhibitCtrl(idx, true);
+                    VspMotorCtrl(idx, true);
+                xSemaphoreGive(xItemMutex);
+            break;
+            }
+        }
+    }
+}
+
+uint8_t SatIsVendOk(void)
+{
+    uint8_t ret;
+    xSemaphoreTake(xVendMutex, portMAX_DELAY);
+    ret =  is_vend;
+    is_vend = 0;
+    xSemaphoreGive(xVendMutex);
+    return ret;
 }
 
 void vTaskLedStream (void *pvParameters)
@@ -524,7 +588,6 @@ void EXTI3_IRQHandler(void)
     
     if (EXTI_GetITStatus(EXTI_Line3))
     {
-
         EXTI_ClearITPendingBit(EXTI_Line3);
         xSemaphoreGiveFromISR(sat_block_poll_sem, &xHigherPriorityTaskWoken);
         if(xHigherPriorityTaskWoken == pdTRUE) taskYIELD();
