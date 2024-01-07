@@ -29,6 +29,7 @@ typedef struct
     bool            temp_val;
     uint32_t        balance;
     flow_item_t     (*items)[FLOW_ITEMS_MAX];
+    uint8_t         item;
 } flow_dev_t;
 
 void FlowInit(void);

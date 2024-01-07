@@ -1,5 +1,4 @@
 {
     #include "../src/satellite/vsp.h"
     source("src/satellite/vsp.c")
-    source("src/satellite/satellite.c")
 }

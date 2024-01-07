@@ -1,6 +1,7 @@
 #include "src/cctalk/cctalk.h"
 #include "flow.h"
 #include "src/lcd/dwin.h"
+#include "src/mdb/cashless.h"
 
 flow_dev_t flow_dev;
 
@@ -37,6 +38,7 @@ flow_item_t flow_items[FLOW_ITEMS_MAX] =
 };
 
 static void FlowIdleFunc(void);
+static void FlowCashlessEnFunc(void);
 static bool FlowGetPriceForItem(uint8_t button, uint32_t *price);
 
 void FlowInit(void)
@@ -58,6 +60,9 @@ void FlowCycle(void)
             break;
         case FLOW_STATE_VEND:
             break;
+        case FLOW_STATE_CASHLESS_EN:
+            FlowCashlessEnFunc();
+            break;
         default:
             break;
     }
@@ -73,7 +78,7 @@ static void FlowIdleFunc(void)
     if (!status)
         return;
 
-    status = FlowGetPriceForItem(button, &price);
+    status = FlowGetPriceForItem(button & 0xff, &price);
     if (!status)
         return;
 
@@ -87,6 +92,19 @@ static void FlowIdleFunc(void)
     return;
 }
 
+static void FlowCashlessEnFunc(void)
+{
+    uint32_t price;
+    uint8_t  item;
+
+    item = flow_dev.item;
+    price = flow_dev.items[item]->price;
+    DwinSetPage(2);
+#ifndef TEST_MDB
+    CashlessVendRequest(price, item);
+#endif
+}
+
 static bool FlowGetPriceForItem(uint8_t button, uint32_t *price)
 {
     for (uint8_t i = 0; i < FLOW_ITEMS_MAX; i++)
@@ -94,6 +112,7 @@ static bool FlowGetPriceForItem(uint8_t button, uint32_t *price)
         if (flow_dev.items[i]->button == button)
         {
             *price = flow_dev.items[i]->price;
+            flow_dev.item = i;
             return true;
         }
     }
