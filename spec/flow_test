@@ -1,8 +1,0 @@
-{
-    #include "../src/flow/flow.h"
-    source("src/flow/flow.c")
-
-    describe("Test flow") do
-        assert_false;
-    end
-}

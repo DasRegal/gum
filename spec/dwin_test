@@ -1,6 +1,6 @@
+#include "../src/lcd/dwin.h"
+source("src/lcd/dwin.c")
 {
-    #include "../src/lcd/dwin.h"
-    source("src/lcd/dwin.c")
 
     describe("RAM command") do
         uint8_t test_buf_1[20] = { 0x5A, 0xA5, 0x06, 0x83, 0x12, 0x34, 0x01, 0x11, 0x22};

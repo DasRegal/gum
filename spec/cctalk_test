@@ -1,0 +1,83 @@
+{
+    #include "../src/cctalk/cctalk.h"
+    source("src/cctalk/cctalk.c")
+
+    describe("CctalkGetCharHandler") do
+        cctalk_master_dev_t *cctalk_dev;
+        cctalk_master_dev_t dev;
+        CctalkInit(dev);
+        cctalk_dev = CctalkGetDev();
+
+       
+
+        context("With data") do
+            uint8_t test_buf_1[] = { 0x01, 0x03, 0x02, 0x00, 0x4E, 0x61, 0xBC, 0x8F };
+            uint8_t size;
+
+            size = sizeof(test_buf_1);
+            CctalkAnswerHandle();
+
+            for (int i = 0; i < size; i++) CctalkGetCharHandler(test_buf_1[i]);
+
+            it("STATE must be valid")
+            do
+                cctalk_dev->state to_eq(CCTALK_STATE_FINISH);
+            end
+        end
+
+        context("With no data") do
+            uint8_t test_buf_1[] = { 0x02, 0x00, 0x01, 242, 11 };
+            uint8_t state;
+            uint8_t size;
+
+            size = sizeof(test_buf_1);
+
+            CctalkAnswerHandle();
+
+            for (int i = 0; i < size; i++) CctalkGetCharHandler(test_buf_1[i]);
+
+            it("STATE must be valid")
+            do
+                cctalk_dev->state to_eq(CCTALK_STATE_FINISH);
+            end
+
+            CctalkAnswerHandle();
+
+            it("STATE must be valid")
+            do
+                for (int i = 0; i < size - 1; i++)
+                {
+                    state = CctalkGetCharHandler(test_buf_1[i]);
+                    cctalk_dev->state not_to_eq(CCTALK_STATE_FINISH);
+                    state not_to_eq(true);
+                }
+                state = CctalkGetCharHandler(test_buf_1[size - 1]);
+                cctalk_dev->state to_eq(CCTALK_STATE_FINISH);
+                state to_eq(true);
+            end
+        end
+
+    end
+
+    // describe("CctalkSendData") do
+    //     cctalk_master_dev_t dev = { .send_data_cb = NULL };
+    //     dev.send_data_cb = NULL;
+    //     CctalkInit(dev);
+
+
+    //     char buf[10];
+    //     cctalk_data_t data = { .buf = buf };
+    //     data.dest_addr = 2;
+    //     data.src_addr  = 1;
+    //     data.buf_len   = 1;
+    //     data.header   = 242;
+    //     for ( int i = 0; i < 1; i++ )
+    //     {
+    //         data.buf[i + 4] = 12;
+    //     }
+
+    //     CctalkSendData(data);
+
+
+    // end
+}
