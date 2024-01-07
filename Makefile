@@ -40,6 +40,7 @@ INCLUDE = -I./ \
 	  -I./src/mdb \
 	  -I./src/lcd \
 	  -I./src/satellite \
+	  -I /src/flow \
 	  -I./src/cctalk
 
 SRCS = 	./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
@@ -75,6 +76,7 @@ SRCS = 	./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
 	./src/lcd/dwin.c \
 	./src/satellite/satellite.c \
 	./src/satellite/vsp.c \
+	./src/flow/flow.c \
 	./main.c
 
 OBJS=$(SRCS:.c=.o)
@@ -93,7 +95,7 @@ cleanall:
 	-find . -name '*.map' -exec rm {} \;
 
 clean:
-	rm -fv ./*.o ./src/*.o ./src/console/*.o ./src/console/rcli/*.o ./src/mdb/*.o ./src/cctalk/*.o ./src/lcd/*.o ./src/vend/*.o ./src/satellite/*.o
+	rm -fv ./*.o ./src/*.o ./src/console/*.o ./src/console/rcli/*.o ./src/mdb/*.o ./src/cctalk/*.o ./src/flow/*.o ./src/lcd/*.o ./src/vend/*.o ./src/satellite/*.o
 	rm -fv ./output/*.elf
 	rm -fv ./output/*.lst
 	rm -fv ./output/*.out

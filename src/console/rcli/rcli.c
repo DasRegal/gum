@@ -317,11 +317,12 @@ char console_func_cmd(unsigned char args, void* argv)
 char cctalk_func_cmd(unsigned char args, void* argv)
 {
     char * help_str = 
-"Usage: cctalk <header> <data_1> [<data_n>]\r\n\r\n";
+"Usage: cctalk <header> [<data_1>...<data_n>]\r\n\r\n";
 
-    uint16_t i;
-    char buf[10];
-    cctalk_data_t data = { .buf = buf };
+    uint8_t hdr;
+    uint8_t size;
+    uint8_t buf[10];
+    char *b;
 
     if (args == 1)
     {
@@ -330,21 +331,48 @@ char cctalk_func_cmd(unsigned char args, void* argv)
         return 0;
     }
 
-    for(uint8_t i = 1; i < args; i++)
+    hdr = (uint8_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * 1, NULL, 10);
+    size = args - 2;
+
+    for(uint8_t i = 0; i < size; i++)
     {
-        buf[i - 1] = (uint16_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * i, NULL, 10);
+        buf[i] = (uint8_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * (i + 2), NULL, 10);
     }
 
-    data.dest_addr = 2;
-    data.src_addr  = 1;
-    data.buf_len   = args - 2;
-    data.header   = (uint16_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * 1, NULL, 10);
-    for ( i = 0; i < args - 2; i++ )
-    {
-        data.buf[i + 4] = (uint16_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * (i + 2), NULL, 16);
-    }
+    // for(uint8_t i = 1; i < args; i++)
+    // {
+    //     buf[i - 1] = (uint16_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * i, NULL, 10);
+    // }
 
-    CctalkSendData(data);
+    // data.dest_addr = 2;
+    // data.src_addr  = 1;
+    // data.buf_len   = args - 2;
+    // data.header   = (uint16_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * 1, NULL, 10);
+    // for (uint8_t i = 0; i < args - 2; i++ )
+    // {
+    //     data.buf[i + 4] = (uint16_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * (i + 2), NULL, 16);
+    // }
+
+    // CctalkSendData(hdr, buf, size);
+    CoinBoxCliCmdSendData(hdr, buf, size);
+    vTaskDelay(20);
+    CoinBoxGetData(&b, &size);
+    PRINT_OS("\r\n");
+    for (uint8_t i = 0; i < size; i++)
+    {
+        sprintf(rcli_out_buf, "0x%x ", (uint8_t)b[i]);
+        PRINT_OS(rcli_out_buf);
+    }
+    PRINT_OS("\r\n");
+    for(uint8_t i = 0; i < size; i++)
+    {
+        if(b[i] >= 32 && b[i] < 127)
+            sprintf(rcli_out_buf, "%c", b[i]);
+        else
+            sprintf(rcli_out_buf, " ");
+        PRINT_OS(rcli_out_buf);
+    }
+    PRINT_OS("\r\n");
     return 0;
 }
 

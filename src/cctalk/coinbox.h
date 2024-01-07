@@ -2,8 +2,10 @@
 #define _COINBOX_H
 
 #include "cctalk.h"
+#include <stdio.h>
 
 void CoinBoxInit(void);
 void UsartSendString_Cctalk(const char *pucBuffer);
+void CoinBoxCliCmdSendData(uint8_t hdr, uint8_t *buf, uint8_t len);
 
 #endif /* _COINBOX_H */

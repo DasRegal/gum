@@ -1,6 +1,9 @@
 #ifndef _CCTALK_H
 #define _CCTALK_H
 
+#include <stdbool.h>
+#include <stdint.h>
+
 #define CCTALK_MAX_BUF_LEN 256
 
 #define CCTALK_HDR_SET_ACCEPT_LIMIT     135
@@ -53,6 +56,8 @@
 #define CCTALK_HDR_READ_INPUT_LINES     237
 #define CCTALK_HDR_TEST_OUTPUT_LINES    238
 #define CCTALK_HDR_TEST_SOLENOIDS       240
+#define CCTALK_HDR_REQ_SW_REV           241
+#define CCTALK_HDR_REQ_SERIAL_NUM       242
 #define CCTALK_HDR_REQ_DB_VERSION       243
 #define CCTALK_HDR_REQ_PRODUCT_CODE     244 /* 244 + 192 */
 #define CCTALK_HDR_REQ_EQ_CATEGORY_ID   245 /* cctalk_equip_cat_id */
@@ -62,12 +67,36 @@
 #define CCTALK_HDR_REQ_POLLING_PRIOR    249
 #define CCTALK_HDR_SIMPLE_POLL          254
 
+typedef enum
+{
+    CCTALK_STATE_DST_ADDR,
+    CCTALK_STATE_LEN,
+    CCTALK_STATE_SRC_ADDR,
+    CCTALK_STATE_HDR,
+    CCTALK_STATE_DATA,
+    CCTALK_STATE_CRC,
+    CCTALK_STATE_FINISH
+} cctalk_state_t;
+
 typedef struct
 {
-    char        master_addr;
-    char        slave_addr;
-    void        (*send_data_cb)(const char*);
-    uint32_t    sn;
+    uint8_t event;
+    uint8_t balance;
+} cctalk_credit_t;
+
+typedef struct
+{
+    cctalk_state_t  state;
+    char            master_addr;
+    char            slave_addr;
+    char            buf[CCTALK_MAX_BUF_LEN];
+    char            buf_tx[CCTALK_MAX_BUF_LEN];
+    uint8_t         buf_cnt;
+    uint8_t         buf_data_len;
+    uint8_t         crc_sum;
+    void            (*send_data_cb)(const char*);
+    uint32_t        sn;
+    cctalk_credit_t credit;
 } cctalk_master_dev_t;
 
 typedef struct
@@ -81,7 +110,12 @@ typedef struct
 } cctalk_data_t;
 
 int CctalkInit(cctalk_master_dev_t dev);
-void CctalkUartHandler(uint8_t ch);
-void CctalkSendData(cctalk_data_t data);
+bool CctalkGetCharHandler(uint8_t ch);
+void CctalkSendData(uint8_t hdr, uint8_t *data, uint8_t size);
+cctalk_master_dev_t *CctalkGetDev(void);
+void CctalkAnswerHandle(void);
+bool CctalkIsEnable(void);
+void CctalkTestFunc(void);
+void CoinBoxGetData(char **buf, uint8_t *len);
 
 #endif /* _CCTALK_H */
