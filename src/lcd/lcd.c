@@ -69,9 +69,6 @@ void LcdInit(void)
 void vTaskLcdBuf(void *pvParameters)
 {
     char ch;
-    uint16_t button;
-    char s[20];
-    char b1[2] = { 0x00, 0x00 };
 
     for(;;)
     {
@@ -84,10 +81,7 @@ void vTaskLcdBuf(void *pvParameters)
 
 void vTaskLcdButton(void *pvParameters)
 {
-    char ch;
-    uint32_t cr;
     uint16_t button;
-    char s[20];
     char b1[6] = { 0x00, 0x00 , 0x00, 0x00, 0x00, 0x00 };
     DwinReset();
     vTaskDelay(1000);
