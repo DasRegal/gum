@@ -261,6 +261,11 @@ void vTaskSatellitePoll (void *pvParameters)
     }
 }
 
+void SatPushLcdButton(uint8_t button)
+{
+    xEventGroupSetBits(xLcdButtonEventGroup, (1 << button));
+}
+
 void SatResume(void)
 {
     for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)

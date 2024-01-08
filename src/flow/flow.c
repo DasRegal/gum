@@ -2,6 +2,7 @@
 #include "flow.h"
 #include "src/lcd/dwin.h"
 #include "src/mdb/cashless.h"
+#include "src/lcd/lcd.h"
 
 flow_dev_t flow_dev;
 
@@ -40,6 +41,8 @@ flow_item_t flow_items[FLOW_ITEMS_MAX] =
 static void FlowIdleFunc(void);
 static void FlowCashlessEnFunc(void);
 static bool FlowGetPriceForItem(uint8_t button, uint32_t *price);
+static void FlowVendRequest(void);
+static void FlowVendItem(void);
 
 void FlowInit(void)
 {
@@ -59,9 +62,13 @@ void FlowCycle(void)
             FlowIdleFunc();
             break;
         case FLOW_STATE_VEND:
+            FlowVendItem();
             break;
         case FLOW_STATE_CASHLESS_EN:
             FlowCashlessEnFunc();
+            break;
+        case FLOW_STATE_VEND_REQUEST:
+            FlowVendRequest();
             break;
         default:
             break;
@@ -98,11 +105,61 @@ static void FlowCashlessEnFunc(void)
     uint8_t  item;
 
     item = flow_dev.item;
-    price = flow_dev.items[item]->price;
+    price = flow_dev.items[item]->price - flow_dev.balance;
     DwinSetPage(2);
 #ifndef TEST_MDB
+    SatPushLcdButton(flow_dev.items[item]->button);
     CashlessVendRequest(price, item);
 #endif
+    flow_dev.state = FLOW_STATE_VEND_REQUEST;
+}
+
+static void FlowVendRequest(void)
+{
+#ifndef TEST_MDB
+    if (CashlessIsVendApproved(NULL))
+    {
+#endif
+        DwinSetPage(3);
+#ifndef TEST_MDB
+        SatVend(flow_dev.item);
+#endif
+        flow_dev.state = FLOW_STATE_VEND;
+#ifndef TEST_MDB
+    }
+#endif
+}
+
+static void FlowVendItem(void)
+{
+    uint8_t res = 1;
+    
+#ifndef TEST_MDB
+    res = SatIsVendOk();
+#endif
+    switch(res)
+    {
+        case 1:
+            flow_dev.balance = 0;
+#ifndef TEST_MDB
+            CashlessVendSuccessCmd(0);
+            LcdUpdateBalance(flow_dev.balance);
+#endif
+            DwinSetPage(1);
+            flow_dev.state = FLOW_STATE_IDLE;
+            break;
+        case 2:
+#ifndef TEST_MDB
+            CashlessVendFailureCmd();
+            LcdUpdateBalance(flow_dev.balance);
+#endif
+            DwinSetPage(1);
+            flow_dev.state = FLOW_STATE_IDLE;
+            break;
+        case 0:
+        default:
+            break;
+    }
 }
 
 static bool FlowGetPriceForItem(uint8_t button, uint32_t *price)

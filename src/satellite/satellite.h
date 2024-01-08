@@ -9,5 +9,6 @@ uint8_t SatGetPushButton(void);
 void SatResume(void);
 void SatVend(uint8_t item);
 uint8_t SatIsVendOk(void);
+void SatPushLcdButton(uint8_t button);
 
 #endif /* _SATELLITE_H */

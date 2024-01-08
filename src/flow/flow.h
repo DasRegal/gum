@@ -21,6 +21,7 @@ typedef enum
     FLOW_STATE_VEND,
     FLOW_STATE_CASHLESS_EN,
     FLOW_STATE_ERROR,
+    FLOW_STATE_VEND_REQUEST,
 } flow_state_t;
 
 typedef struct
