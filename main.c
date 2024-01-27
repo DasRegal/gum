@@ -16,6 +16,7 @@
 #include "src/cctalk/coinbox.h"
 #include "src/lcd/lcd.h"
 #include "src/satellite/satellite.h"
+#include "src/flow/flow_os.h"
 
 SemaphoreHandle_t semTickPulse;
 static void PrintBanner(void);
@@ -47,6 +48,8 @@ void main()
 
     CoinBoxInit();
     SatInit();
+
+    FlowOsInit();
 
     xTaskCreate(
         vTaskCode,

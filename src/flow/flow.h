@@ -26,11 +26,12 @@ typedef enum
 
 typedef struct
 {
+    flow_item_t     *items;
     flow_state_t    state;
     bool            temp_val;
     uint32_t        balance;
-    flow_item_t     (*items)[FLOW_ITEMS_MAX];
     uint8_t         item;
+    bool            is_timeout;
 } flow_dev_t;
 
 void FlowInit(void);
@@ -40,6 +41,10 @@ bool FlowGetTempVal(void);
 flow_state_t FlowStateGet(void);
 bool FlowCoinBoxIsEnable(void);
 uint32_t FlowGetBalance(void);
-void FlowCycle(void);
+bool FlowCycle(flow_state_t *state);
+void LcdUpdateBalance(uint32_t balance);
+void FlowInitCycle(void);
+void FlowVendTimeout(void);
+// void (*session_cancel_cb)(void);
 
 #endif /* _FLOW_H */

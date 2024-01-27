@@ -77,6 +77,7 @@ SRCS = 	./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
 	./src/satellite/satellite.c \
 	./src/satellite/vsp.c \
 	./src/flow/flow.c \
+	./src/flow/flow_os.c \
 	./main.c
 
 OBJS=$(SRCS:.c=.o)

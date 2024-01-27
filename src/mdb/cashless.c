@@ -631,11 +631,11 @@ uint8_t CashlessVendSuccessCmd(uint16_t item)
 
 uint8_t CashlessVendFailureCmd(void)
 {
-    if (cashless_dev.vendStat == CL_VEND_APPROVED)
-    {
+    // if (cashless_dev.vendStat == CL_VEND_APPROVED)
+    // {
         cashless_dev.isVendFailure = true;
         return 0;
-    }
+    // }
 
     return 1;
 }

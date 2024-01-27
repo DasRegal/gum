@@ -140,9 +140,9 @@ void vTaskSatellitePoll (void *pvParameters)
     // VspBlock(3, true);
     for( ;; )
     {
-        // xSemaphoreTake(sat_block_poll_sem, portMAX_DELAY);
-        if (xSemaphoreTake(sat_block_poll_sem, 60000) == pdPASS)
-        {
+        xSemaphoreTake(sat_block_poll_sem, portMAX_DELAY);
+        // if (xSemaphoreTake(sat_block_poll_sem, 60000) == pdPASS)
+        // {
             uint8_t item = VspGetSelectItem();
             if(item < VSP_MAX_ITEMS)
             {
@@ -173,24 +173,24 @@ void vTaskSatellitePoll (void *pvParameters)
             }
 
             /* Start from buttons */
-            for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
-            {
-                xSemaphoreTake(xItemMutex, portMAX_DELAY);
-                bool is_push = VspButton(idx);
-                xSemaphoreGive(xItemMutex);
-                if (is_push)
-                {
-                    vTaskSuspend(ledstream_handler);
-                    VspSelectItem(idx);
+            // for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
+            // {
+            //     xSemaphoreTake(xItemMutex, portMAX_DELAY);
+            //     bool is_push = VspButton(idx);
+            //     xSemaphoreGive(xItemMutex);
+            //     if (is_push)
+            //     {
+            //         vTaskSuspend(ledstream_handler);
+            //         VspSelectItem(idx);
 
-                    xSemaphoreTake(xItemMutex, portMAX_DELAY);
-                    VspInhibitCtrl(idx, true);
-                    VspMotorCtrl(idx, true);
-                    xSemaphoreGive(xItemMutex);
+            //         xSemaphoreTake(xItemMutex, portMAX_DELAY);
+            //         VspInhibitCtrl(idx, true);
+            //         VspMotorCtrl(idx, true);
+            //         xSemaphoreGive(xItemMutex);
 
-                    break;
-                }
-            }
+            //         break;
+            //     }
+            // }
 
             /* Start from LCD buttons */
             flags = xEventGroupGetBits(xLcdButtonEventGroup);
@@ -221,42 +221,44 @@ void vTaskSatellitePoll (void *pvParameters)
 
             /* If pushed the button */
             if(VspGetSelectItem() < VSP_MAX_ITEMS)
+            {
                 continue;
+            }
 
             vTaskDelay(100);
             xSemaphoreGive(sat_block_poll_sem);
-        }
-        else
-        {
-            xSemaphoreTake(xVendMutex, portMAX_DELAY);
-                is_vend = 2;
-            xSemaphoreGive(xVendMutex);
+        // }
+        // else
+        // {
+        //     xSemaphoreTake(xVendMutex, portMAX_DELAY);
+        //         is_vend = 2;
+        //     xSemaphoreGive(xVendMutex);
 
 
-            // uint8_t item = VspGetSelectItem();
-            // xSemaphoreTake(xItemMutex, portMAX_DELAY);
-            // VspInhibitCtrl(item, false);
-            // SatContinuePoll();
-            // xSemaphoreGive(xItemMutex);
-            // vTaskResume(ledstream_handler);
+        //     // uint8_t item = VspGetSelectItem();
+        //     // xSemaphoreTake(xItemMutex, portMAX_DELAY);
+        //     // VspInhibitCtrl(item, false);
+        //     // SatContinuePoll();
+        //     // xSemaphoreGive(xItemMutex);
+        //     // vTaskResume(ledstream_handler);
 
-            // DwinSetPage(1);
+        //     // DwinSetPage(1);
 
-            xSemaphoreTake(xItemMutex, portMAX_DELAY);
-                uint8_t item = VspGetSelectItem();
-                VspMotorCtrl(item, false);
+        //     xSemaphoreTake(xItemMutex, portMAX_DELAY);
+        //         uint8_t item = VspGetSelectItem();
+        //         VspMotorCtrl(item, false);
 
-                VspInhibitCtrl(item, false);
-                for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
-                {
-                    VspDeselectItem(idx);
-                }
-            xSemaphoreGive(xItemMutex);
+        //         VspInhibitCtrl(item, false);
+        //         for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
+        //         {
+        //             VspDeselectItem(idx);
+        //         }
+        //     xSemaphoreGive(xItemMutex);
             
-            vTaskResume(ledstream_handler);
+        //     vTaskResume(ledstream_handler);
             
-            xSemaphoreGive(sat_block_poll_sem);
-        }
+        //     xSemaphoreGive(sat_block_poll_sem);
+        // }
 
     }
 }
@@ -266,38 +268,60 @@ void SatPushLcdButton(uint8_t button)
     xEventGroupSetBits(xLcdButtonEventGroup, (1 << button));
 }
 
-void SatResume(void)
+void SatVendTimeout(void)
 {
-    for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
-    {
-        VspDeselectItem(idx);
-    }
+    xSemaphoreTake(xVendMutex, portMAX_DELAY);
+        is_vend = 2;
+    xSemaphoreGive(xVendMutex);
+
+    xSemaphoreTake(xItemMutex, portMAX_DELAY);
+        uint8_t item = VspGetSelectItem();
+        VspMotorCtrl(item, false);
+
+        VspInhibitCtrl(item, false);
+        for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
+        {
+            VspDeselectItem(idx);
+        }
     xSemaphoreGive(xItemMutex);
+    
     vTaskResume(ledstream_handler);
     
     xSemaphoreGive(sat_block_poll_sem);
 }
 
+// void SatResume(void)
+// {
+//     for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
+//     {
+//         VspDeselectItem(idx);
+//     }
+//     xSemaphoreGive(xItemMutex);
+//     vTaskResume(ledstream_handler);
+    
+//     xSemaphoreGive(sat_block_poll_sem);
+// }
+
 void SatVend(uint8_t item)
 {
-    EventBits_t flags;
-    flags = xEventGroupGetBits(xLcdVendItemGroup);
-    if (flags)
-    {
-        for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
-        {
-            if ( flags & (1 << idx))
-            {
-                xEventGroupClearBits(xLcdVendItemGroup, (1 << idx));
+    // EventBits_t flags;
+    // flags = xEventGroupGetBits(xLcdVendItemGroup);
+    // if (flags)
+    // {
+    //     for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
+    //     {
+    //         if ( flags & (1 << idx))
+    //         {
+                // xEventGroupClearBits(xLcdVendItemGroup, (1 << idx));
                 
                 xSemaphoreTake(xItemMutex, portMAX_DELAY);
-                    VspInhibitCtrl(idx, true);
-                    VspMotorCtrl(idx, true);
+                    VspInhibitCtrl(item, true);
+                    VspMotorCtrl(item, true);
                 xSemaphoreGive(xItemMutex);
-            break;
-            }
-        }
-    }
+    //         break;
+    //         }
+    //     }
+    // }
 }
 
 uint8_t SatIsVendOk(void)
