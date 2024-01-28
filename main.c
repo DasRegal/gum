@@ -66,6 +66,7 @@ void main()
 
 static void PrintBanner(void)
 {
+    char s[28];
     PRINT_OS("\r\n");
     PRINT_OS("    ____ _    __               __\r\n");
     PRINT_OS("   / __ \\ |  / /__  ____  ____/ /\r\n");
@@ -73,6 +74,9 @@ static void PrintBanner(void)
     PRINT_OS(" / _, _/| |/ /  __/ / / / /_/ /\r\n");
     PRINT_OS("/_/ |_| |___/\\___/_/ /_/\\__,_/\r\n");
     PRINT_OS("                               RVend\r\n");
+
+    sprintf(s, "Build: %s\r\n", GIT_HASH);
+    PRINT_OS(s);
 }
 
 // =============================================================================
