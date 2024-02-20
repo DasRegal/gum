@@ -33,7 +33,6 @@ typedef struct
 static coinbox_data_t coinbox_data;
 
 static void CctalkUsartInit(void);
-// static uint8_t CoinBoxGetHeader(void);
 void vTaskCoinBoxPoll ( void *pvParameters);
 
 QueueHandle_t fdBuferCctalk;
@@ -54,21 +53,12 @@ void vTaskCctalk(void *pvParameters)
             xSemaphoreTake(xBalanceMutex, portMAX_DELAY);
                 if(CctalkGetCharHandler(ch))
                 {
-                        if (dev->credit.balance)
-                        {
-                            is_balance_change = true;
-                            FlowBalanceUpdateCb(dev->credit.balance);
-                            dev->credit.balance = 0;
-                        }
-                    // header = CoinBoxGetHeader();
-                    // switch(header)
-                    // {
-                    //     case CCTALK_HDR_READ_BUF_CREDIT:
-                    //         break;
-                    //     default:
-                    //         break;
-                    // }
-
+                    if (dev->credit.balance)
+                    {
+                        is_balance_change = true;
+                        FlowBalanceUpdateCb(dev->credit.balance);
+                        dev->credit.balance = 0;
+                    }
                     CctalkAnswerHandle();
                 }
             xSemaphoreGive(xBalanceMutex);
@@ -83,25 +73,6 @@ void CoinBoxGetData(char **buf, uint8_t *len)
     *buf = dev->buf;
     *len = dev->buf_data_len;
 }
-
-// static uint8_t CoinBoxGetHeader(void)
-// {
-//     // cctalk_master_dev_t *dev;
-//     // dev = CctalkGetDev();
-//     // return dev->buf_tx[3];
-// }
-
-// static bool CoinBoxIsUpdateCreditData(void)
-// {
-//     // cctalk_master_dev_t *dev;
-//     // dev = CctalkGetDev();
-//     // dev->buf;
-
-//     // if((dev->buf[0]) != coinbox_data.balance_counter)
-//     // {
-//     //     coinbox_data.balance_counter = dev->buf[0];
-//     // }
-// }
 
 bool CoinBoxIsUpdateBalance(uint32_t *balance)
 {
@@ -144,16 +115,19 @@ void vTaskCoinBoxPoll ( void *pvParameters)
     CctalkSendData(CCTALK_HDR_REQ_INH_STAT, NULL, 0);
     vTaskDelay(200);
 
-    // data[0] = 7;
-    // CoinBoxCliCmdSendData(CCTALK_HDR_REQ_COIN_ID, data, 1);
-    // 1 RU100A
-    // 2 RU100B
-    // 3 RU200A
-    // 4 RU200B
-    // 5 RU500A
-    // 6 RU500B
-    // 7 RU1K0A
-    // 8 RU1K0B
+    /**
+      * data[0] = 7;
+      * CoinBoxCliCmdSendData(CCTALK_HDR_REQ_COIN_ID, data, 1);
+      * 1 RU100A
+      * 2 RU100B
+      * 3 RU200A
+      * 4 RU200B
+      * 5 RU500A
+      * 6 RU500B
+      * 7 RU1K0A
+      * 8 RU1K0B 
+      */
+
     for( ;; )
     {
         flags = xEventGroupGetBits(xCCTalkEventGroup);
@@ -191,12 +165,10 @@ void CoinBoxInit(void)
     coinbox_data.balance_counter = 0;
 
     fdBuferCctalk = xQueueCreate(256, sizeof(uint8_t));
-    // cctalk_dev_t cctalk_dev;
     CctalkInit(dev);
     CctalkUsartInit();
 
     xCCTalkEventGroup = xEventGroupCreate();
-    // vSemaphoreCreateBinary(cctalk_transfer_sem);
 
     xBalanceMutex = xSemaphoreCreateMutex();
 
@@ -243,124 +215,6 @@ void CctalkUsartInit(void)
     USART_ITConfig(USART3, USART_IT_RXNE, DISABLE);
     USART_ITConfig(USART3, USART_IT_TXE, DISABLE);
     USART_ITConfig(USART3, USART_IT_TC, DISABLE);
-
-
-    //  char buf[10];
-    // cctalk_data_t data = { .buf = buf };
-    // data.dest_addr = 2;
-    // data.buf_len = 0;
-    // data.src_addr = 1;
-    // data.header = 242;
-    // CctalkSendData(data);
-
-    // for (int i = 0; i < 5000; i++);
-    // char buf[20];
-    // // strcpy(buf, "Hello");
-    // // UsartSendString_Cctalk(buf);
-
-    // // Req equipment category id "Coin Acceptor"
-    // char buf[10] = {2, 0, 1, 246, 7, '\n'};
-    // buf[0] = 2;
-    // buf[1] = 0;
-    // buf[2] = 1;
-    // buf[3] = 245;
-    // buf[4] = 8;
-    // for (char i = 0; i < 5; i++)
-    // {
-    // while(USART_GetFlagStatus(USART3, USART_FLAG_TXE) == RESET);
-    // USART_SendData(USART3, buf[i] );
-
-    // }
-
-    // Req product code "SCA1"
-// for (int i = 0; i < 50000; i++);
-//      buf[0] = 2;
-//     buf[1] = 0;
-//     buf[2] = 1;
-//     buf[3] = 244;
-//     buf[4] = 9;
-//     for (char i = 0; i < 5; i++)
-//     {
-//     while(USART_GetFlagStatus(USART3, USART_FLAG_TXE) == RESET);
-//     USART_SendData(USART3, buf[i] );
-
-//     }
-
-//     // Req build code "Standard"
-// // for (int i = 0; i < 50000; i++);
-    //  buf[0] = 2;
-    // buf[1] = 0;
-    // buf[2] = 1;
-    // buf[3] = 192;
-    // buf[4] = 61;
-//     for (char i = 0; i < 5; i++)
-//     {
-//     while(USART_GetFlagStatus(USART3, USART_FLAG_TXE) == RESET);
-//     USART_SendData(USART3, buf[i] & 0x00FF );
-
-//     }
-
-    // Serial number "C16B3D"
-    // Received data : [ serial 1 ] [ serial 2 ] [ serial 3 ]
-    // = [ serial 1 ] + 256 * [ serial 2 ] + 65536 * [ serial 3 ]
-    // 3997696 + 27392 + 193 = 4025281
-// for (int i = 0; i < 50000; i++);
-    //  buf[0] = 2;
-    // buf[1] = 0;
-    // buf[2] = 1;
-    // buf[3] = 242;
-    // buf[4] = 11;
-    // for (char i = 0; i < 5; i++)
-    // {
-    // while(USART_GetFlagStatus(USART3, USART_FLAG_TXE) == RESET);
-    // USART_SendData(USART3, buf[i] & 0x00FF );
-
-    // }
-
-//     // Request software revision "SB10C"
-// // for (int i = 0; i < 50000; i++);
-//      buf[0] = 2;
-//     buf[1] = 0;
-//     buf[2] = 1;
-//     buf[3] = 241;
-//     buf[4] = 12;
-//     for (char i = 0; i < 5; i++)
-//     {
-//     while(USART_GetFlagStatus(USART3, USART_FLAG_TXE) == RESET);
-//     USART_SendData(USART3, buf[i] );
-
-//     }
-
-//     // Request comms revision "0x01 0x04 0x02" - 1.4.2
-// // for (int i = 0; i < 50000; i++);
-//     buf[0] = 2;
-//     buf[1] = 0;
-//     buf[2] = 1;
-//     buf[3] = 4;
-//     buf[4] = 249;
-//     for (char i = 0; i < 5; i++)
-//     {
-//         while(USART_GetFlagStatus(USART3, USART_FLAG_TXE) == RESET);
-//         USART_SendData(USART3, buf[i] );
-//     }
-
-    // // Request coin id for coin 1 = ""
-    // buf[0] = 2;
-    // buf[1] = 2;
-    // buf[2] = 1;
-    // buf[3] = 231;
-    // buf[4] = 255;
-    // buf[5] = 255;
-    // buf[6] = 22;
-    // for (char i = 0; i < 7; i++)
-    // {
-    //     while(USART_GetFlagStatus(USART3, USART_FLAG_TXE) == RESET);
-    //     USART_SendData(USART3, buf[i] );
-    // }
-
-    // for (int i = 0; i < 5000; i++);
-    // UsartSendString_Cctalk(buf);
-
 }
 
 volatile char*    pCBTxData;
@@ -376,8 +230,6 @@ void UsartSendString_Cctalk(const char *pucBuffer)
 
 void UART3InterruptHandler(void)
 {
-
-    // static  portBASE_TYPE   xHigherPriorityTaskWoken = pdFALSE;
     if(USART_GetITStatus(USART3, USART_IT_RXNE) != RESET)
     {
         portBASE_TYPE true_false;
@@ -402,9 +254,6 @@ void UART3InterruptHandler(void)
     {   //всё передали
         USART_ClearITPendingBit(USART3, USART_IT_TC);
         USART_ITConfig(USART3, USART_IT_TC, DISABLE);
-
-        // xSemaphoreGiveFromISR(DebugUsartTxOk    ,&xHigherPriorityTaskWoken  );
-        // if( xHigherPriorityTaskWoken == pdTRUE )    taskYIELD();
 
         USART_ReceiveData(USART3);
         USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);

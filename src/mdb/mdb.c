@@ -298,7 +298,6 @@ void MdbSendCommand(uint8_t cmd, uint8_t subcmd, uint8_t * data)
     {
         mdb_dev.tx_data[1] = MdbCalcChk(mdb_dev.tx_data, 1);
         MdbSendData(mdb_dev.tx_data, 2);
-        // DEBUG_PRINT(("\n%s: 0x%x 0x%x\n", __func__, mdb_dev.tx_data[0], mdb_dev.tx_data[1]));
         return;
     }
 
@@ -545,13 +544,6 @@ static mdb_ret_resp_t MdbParseResponse(void)
                 mdb_dev.dev_slave.decimal_places    = mdb_dev.rx_data[5];
                 mdb_dev.dev_slave.misc              = mdb_dev.rx_data[7];
 
-                // if (mdb_dev.level > mdb_dev.dev_slave.level)
-                // {
-                //     mdb_dev.level = mdb_dev.dev_slave.level;
-                //     mdb_dev.dev_slave.max_resp_time = mdb_dev.rx_data[6];
-                //     return MDB_RET_UPDATE_LEVEL;
-                // }
-
                 if (mdb_dev.dev_slave.max_resp_time != mdb_dev.rx_data[6])
                 {
                     mdb_dev.dev_slave.max_resp_time = mdb_dev.rx_data[6];
@@ -562,14 +554,13 @@ static mdb_ret_resp_t MdbParseResponse(void)
             }
         /* Not resp, only POLL */
         case MDB_POLL_DISPLAY_REQ_RESP:
-            // TODO Проверить функционал вендисты
+            /* TODO Проверить функционал вендисты */
             return MDB_RET_OK_DATA;
         /* Not resp, only POLL */
         case MDB_POLL_BEGIN_SESSION_RESP:
             {
                 mdb_dev.state = MDB_STATE_SESSION_IDLE;
-                // TODO Проверить что приходит
-                // MdbSelectItem();
+                /* TODO Проверить что приходит */
                 return MDB_RET_BEGIN_SESSION;
             }
         /* Not resp, only POLL p134 */
@@ -594,8 +585,8 @@ static mdb_ret_resp_t MdbParseResponse(void)
         case MDB_POLL_END_SESSION_RESP:
             {
                 mdb_dev.state = MDB_STATE_SESSION_IDLE;
-                //TODO
-                // Check max non-response time!
+                /* TODO */
+                /* Check max non-response time! */
                 return MDB_RET_END_SESSION;
                 break;
             }
@@ -806,15 +797,3 @@ void MdbUsartInit(void)
     USART_Cmd(USART2, ENABLE);
 }
 #endif
-
-void MdbPrint(void)
-{
-    // char buf[128];
-    // sprintf(buf, "\r\n===\r\n");
-    // UsartDebugSendString(buf);
-    // for(int i = 0; i < 20; i++)
-    // {
-    //  sprintf(buf, "%d ", ubuf[i]);
-    //  UsartDebugSendString(buf);
-    // }
-}

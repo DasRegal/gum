@@ -102,8 +102,6 @@ char *cctalk_self_check_err_code[44] =
     "Accept gate failed closed"
 };
 
-// static char                 cctalk_buf[CCTALK_MAX_BUF_LEN];
-// static cctalk_data_t        cctalk_data = { .buf          = cctalk_buf };
 static cctalk_master_dev_t  cctalk_dev  = { .send_data_cb = NULL,
                                             .master_addr  = 1,
                                             .slave_addr   = 2 };
@@ -111,7 +109,6 @@ static cctalk_master_dev_t  cctalk_dev  = { .send_data_cb = NULL,
 extern void UsartDebugSendString(const char *pucBuffer);
 static char CctalkSimpleCheckSum(void);
 static void CctalkUpdateBalance(void);
-// static char CctalkSimpleCheckSum(cctalk_data_t data);
 
 int CctalkInit(cctalk_master_dev_t dev)
 {
@@ -153,21 +150,6 @@ void CctalkSendData(uint8_t hdr, uint8_t *data, uint8_t size)
     CctalkAnswerHandle();
 }
 
-// void CctalkSendData(cctalk_data_t data)
-// {
-//     data.buf[0] = data.dest_addr;
-//     data.buf[1] = data.buf_len;
-//     data.buf[2] = data.src_addr;
-//     data.buf[3] = data.header;
-//     data.buf[data.buf_len + 4] = CctalkSimpleCheckSum(data);
-
-//     // cctalk_dev.buf_cnt = 0;
-//     // cctalk_dev.buf_data_len = 0;
-
-//     cctalk_dev.send_data_cb(data.buf);
-//     CctalkAnswerHandle();
-// }
-
 static char CctalkSimpleCheckSum(void)
 {
     uint16_t        i;
@@ -180,19 +162,6 @@ static char CctalkSimpleCheckSum(void)
 
     return sum;
 }
-
-// static char CctalkSimpleCheckSum(cctalk_data_t data)
-// {
-//     uint16_t        i;
-//     uint8_t         sum = 0;
-//     for (i = 0; i < data.buf_len + 4; i++)
-//     {
-//         sum = (sum + data.buf[i]) % 256;
-//     }
-//     sum = 256 - sum;
-
-//     return sum;
-// }
 
 bool CctalkGetCharHandler(uint8_t ch)
 {
@@ -243,8 +212,6 @@ bool CctalkGetCharHandler(uint8_t ch)
             if (cctalk_dev.crc_sum == 0)
             {
                 cctalk_dev.state = CCTALK_STATE_FINISH;
-                // cctalk_dev.state = CCTALK_STATE_DST_ADDR;
-                // return true;
             }
             else
             {
@@ -360,17 +327,4 @@ void CctalkAnswerHandle(void)
 bool CctalkIsEnable(void)
 {
     return true;
-}
-
-void CctalkTestFunc(void)
-{
-    // char buf[10];
-    // cctalk_data_t data = { .buf = buf };
-    // data.dest_addr = 2;
-    // data.buf_len = 0;
-    // data.src_addr = 1;
-    // data.header = 242;
-    // CctalkSendData(data);
-
-    CctalkSendData(CCTALK_HDR_REQ_SERIAL_NUM, NULL, 0);
 }

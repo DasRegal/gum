@@ -260,7 +260,7 @@ char buf_clear(ctrlBuf_s *bufStruct)
         return 1;
     }
 
-    // memset is evil. Param size in bytes.
+    /* Param size in bytes. */
     memset(bufStruct->pBuf, '\0', bufStruct->max_size);
 
     bufStruct->is_clear = 1;

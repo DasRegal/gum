@@ -79,11 +79,11 @@ static void PrintBanner(void)
     PRINT_OS(s);
 }
 
-// =============================================================================
-//
-//         Задача демон, выполняющийся при запуске планировщика FreeRTOS
-//
-// =============================================================================
+/* ============================================================================= */
+/*                                                                               */
+/*         Задача демон, выполняющийся при запуске планировщика FreeRTOS         */
+/*                                                                               */
+/* ============================================================================= */
 
 void vApplicationDaemonTaskStartupHook( void )
 {
@@ -92,14 +92,13 @@ void vApplicationDaemonTaskStartupHook( void )
 
 void vApplicationMallocFailedHook( void )
 {
-
     for( ;; );
 }
 void vApplicationStackOverflowHook( TaskHandle_t pxTask, char *pcTaskName )
 {
-
     for( ;; );
 }
 void vApplicationIdleHook( void )
 {
+
 }

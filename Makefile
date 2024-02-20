@@ -22,9 +22,9 @@ CFLAGS= -c -fno-common \
 	-D'GIT_HASH="$(GIT_HASH)"'
 
 LDSCRIPT=./stm32f103rc.ld
-LDFLAGS	= --gc-sections,-T$(LDSCRIPT),-lnosys
-OCFLAGS	= -Obinary
-ODFLAGS	= -S
+LDFLAGS = --gc-sections,-T$(LDSCRIPT),-lnosys
+OCFLAGS = -Obinary
+ODFLAGS = -S
 OUTPUT_DIR = output
 TARGET  = $(OUTPUT_DIR)/main
 
@@ -45,7 +45,7 @@ INCLUDE = -I./ \
 	  -I /src/flow \
 	  -I./src/cctalk
 
-SRCS = 	./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
+SRCS =  ./CMSIS/CM3/DeviceSupport/ST/STM32F10x/system_stm32f10x.c \
 	./stm32f10x_it.c \
 	./STM32F10x_StdPeriph_Lib_V3.6.0/Libraries/STM32F10x_StdPeriph_Driver/src/stm32f10x_rcc.c \
 	./STM32F10x_StdPeriph_Lib_V3.6.0/Libraries/STM32F10x_StdPeriph_Driver/src/stm32f10x_gpio.c \

@@ -34,7 +34,6 @@ void VmcChooseItem(uint16_t price, uint16_t item);
 QueueHandle_t       fdBuferMdbRec;
 QueueHandle_t       fdBufMdbData;
 SemaphoreHandle_t   mdb_transfer_sem;
-// SemaphoreHandle_t   mdb_start_rx_sem;
 SemaphoreHandle_t   mdb_poll_sem;
 EventGroupHandle_t  xCreatedEventGroup;
 EventGroupHandle_t  xSetupSeqEg; 
@@ -178,8 +177,8 @@ void vTaskMdbPoll ( void *pvParameters)
 
         if (flags & MDB_OS_SESS_CANCEL)
         {
-            // TODO
-            // ОТМЕНА, ВОЗВРАТ ДЕНЕГ
+            /* TODO */
+            /* ОТМЕНА, ВОЗВРАТ ДЕНЕГ */
 
             xEventGroupClearBits(xCreatedEventGroup, MDB_OS_SESS_CANCEL);
             MdbSendCommand(MDB_VEND_CMD_E, MDB_VEND_SESS_COMPL_SUBCMD, NULL);
@@ -246,10 +245,6 @@ void vTimerNonRespCb( TimerHandle_t xTimer )
     mdb_count_non_resp--;
     if (mdb_count_non_resp == 0)
     {
-        // mdb_count_non_resp = MDB_COUNT_NON_RESP;
-        // /* RESTART */
-        // xEventGroupSetBits(xSetupSeqEg, MDB_OS_IS_SETUP_FLAG);
-        // xSemaphoreGive(mdb_transfer_sem);
         MdbOsReset();
     }
 }
@@ -274,7 +269,6 @@ void MdbOsInit(void)
 {
 
     vSemaphoreCreateBinary(mdb_transfer_sem);
-    // vSemaphoreCreateBinary(mdb_start_rx_sem);
     vSemaphoreCreateBinary(mdb_poll_sem);
 
     xNonResponseTimer = xTimerCreate ( "NonRespTimer", 
@@ -358,7 +352,7 @@ static void MdbOsSetupSeq(EventBits_t flags)
         MdbSendCommand(MDB_READER_CMD_E, MDB_READER_ENABLE_SUBCMD, NULL);
     }
 
-    // Last flag
+    /* Last flag */
     xEventGroupClearBits(xSetupSeqEg, flags);
 }
 
@@ -457,9 +451,6 @@ void DMA1_Channel7_IRQHandler(void)
         DMA_ClearITPendingBit(DMA1_IT_TC7);
         USART_DMACmd(USART2, USART_DMAReq_Tx, DISABLE);
         DMA_ITConfig(DMA1_Channel7, DMA_IT_TC, DISABLE);
-
-        // xSemaphoreGiveFromISR(mdb_start_rx_sem, &xHigherPriorityTaskWoken);
-        // if(xHigherPriorityTaskWoken == pdTRUE) taskYIELD();
 
         xTimerStartFromISR(xNonResponseTimer, &xHigherPriorityTaskWoken);
         if(xHigherPriorityTaskWoken == pdTRUE) taskYIELD();
@@ -587,9 +578,4 @@ void CashlessVendFailure(void)
         return;
 
     /* VEND FAILURE COMMAND */
-}
-
-uint8_t CashlessPoll(void)
-{
-
 }

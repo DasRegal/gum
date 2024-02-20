@@ -14,7 +14,9 @@
 
 extern void UsartDebugSendString(const char *pucBuffer);
 
-#define BUF_MAX 128
+#define BUF_MAX                 128
+#define RCLI_ARGS_LENGTH        10
+#define RCLI_ARGS_MAX_COUNT     10
 
 static char buf[BUF_MAX];
 static char rcli_out_buf[BUF_MAX];
@@ -77,10 +79,6 @@ char RcliTransferChar(const char ch)
     return 0;
 }
 
-void RcliReceiveChar(char ch)
-{
-}
-
 static char RcliTransferStr(char * const pBuf, unsigned char len)
 {
     char *buf = pBuf;
@@ -119,10 +117,6 @@ void RcliInit(void)
     init_esc_seq_state_machine();
 }
 
-char operate_buf[BUF_MAX];
-
-#define RCLI_ARGS_LENGTH    10
-#define RCLI_ARGS_MAX_COUNT 10
 char echo_func_cmd(unsigned char args, void* argv)
 {
     sprintf(rcli_out_buf, "Hello from echo callback!\r\n");
@@ -339,21 +333,6 @@ char cctalk_func_cmd(unsigned char args, void* argv)
         buf[i] = (uint8_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * (i + 2), NULL, 10);
     }
 
-    // for(uint8_t i = 1; i < args; i++)
-    // {
-    //     buf[i - 1] = (uint16_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * i, NULL, 10);
-    // }
-
-    // data.dest_addr = 2;
-    // data.src_addr  = 1;
-    // data.buf_len   = args - 2;
-    // data.header   = (uint16_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * 1, NULL, 10);
-    // for (uint8_t i = 0; i < args - 2; i++ )
-    // {
-    //     data.buf[i + 4] = (uint16_t)strtol((char*)(argv) + RCLI_ARGS_LENGTH * (i + 2), NULL, 16);
-    // }
-
-    // CctalkSendData(hdr, buf, size);
     CoinBoxCliCmdSendData(hdr, buf, size);
     vTaskDelay(20);
     CoinBoxGetData(&b, &size);
@@ -634,15 +613,12 @@ char rcli_parse_cmd(ctrlBuf_s bufStruct)
 {
     char pos = -1;
     char res = -1;
-//    unsigned char n = 0;
     char *pBuf = NULL;
-    // printf("---\n%s\n---\n", bufStruct->pBuf);
     
     res = buf_get_count_params(bufStruct); 
     
     if (res == -1)
     {
-        //DEBUG_PRINT(("%s: Error get count params\n", __func__));
         return -1;
     }
 
@@ -651,12 +627,11 @@ char rcli_parse_cmd(ctrlBuf_s bufStruct)
         return 0;
     }
 
-    // Get first word position
+    /* Get first word position */
     pos = buf_get_pos_n_word(bufStruct, 0);
 
     if (pos == -1)
     {
-        //DEBUG_PRINT(("%s: Error get %d word position\n", __func__, n));
         return -1;
     }
 
@@ -665,7 +640,6 @@ char rcli_parse_cmd(ctrlBuf_s bufStruct)
     {
         if (rcli_commands[i].argv == NULL)
         {
-            //DEBUG_PRINT(("%s: rcli command is NULL. Check rcli_commands %d line.\n", __func__, i + 1));
             continue;
         }
 
@@ -673,7 +647,7 @@ char rcli_parse_cmd(ctrlBuf_s bufStruct)
         char * pCmdPos = strstr(pBuf, rcli_commands[i].argv[0]);
         if (pCmdPos != pBuf + pos)
         {
-            // printf("NOT CALLBACK\r\n");
+            /* no callback function */
         }
         else
         {
@@ -705,7 +679,7 @@ char rcli_parse_cmd(ctrlBuf_s bufStruct)
             {
                 if (rcli_commands[i].func(args, (char**)arr) == -1)
                 {
-                    //DEBUG_PRINT(("%s: Callback for '%s' command returned an error.\n", __func__, (char*)rcli_commands[i].argv[0]));
+                    /* Return error */
                 }
             }
             break;
@@ -725,8 +699,7 @@ char rcli_parse_cmd(ctrlBuf_s bufStruct)
 void rcli_parse_buf(char * buf)
 {
     char *p_tmp;
-//    char pos = 0;
-    // block uart
+    /* block uart */
     if (buf == NULL)
         return;
     
@@ -748,7 +721,7 @@ void rcli_parse_buf(char * buf)
     }
     while(*p_tmp++);
     buf[0] = '\0';
-    //unblock uart
+    /* unblock uart */
 }
 
 
@@ -783,7 +756,7 @@ void RcliUartHandler(uint8_t ch)
             return;
     }
 
-    // BACKSPACE
+    /* BACKSPACE */
     if (c == 127 || c == 8)
     {
         if (bufStruct.end + 1 - bufStruct.cur_pos == 0)
@@ -800,7 +773,7 @@ void RcliUartHandler(uint8_t ch)
         return;
     }
 
-    // LETTER
+    /* LETTER */ 
     if ((c >= 32 && c < 127))
     {
         buf_add(&bufStruct, c, 0);
@@ -819,28 +792,27 @@ void RcliUartHandler(uint8_t ch)
             RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
         }
         else
-            RcliTransferChar(c);//putchar(c);
+            RcliTransferChar(c);
 
         if (i >= BUF_MAX)
             return;
         i++;
     }
 
-    // ENTER
+    /* ENTER */
     if (c == 13)
     {
         sprintf(rcli_out_buf, "\r\n");
         RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
         rcli_parse_buf(bufStruct.pBuf);
 
-        //buf_debug(bufStruct);
         buf_clear(&bufStruct);
-        
+
         sprintf(rcli_out_buf, "%s", RCLI_PROMPT_STR);
         RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
     }
 
-    // TAB
+    /* TAB */
     if (c == 9)
     {
         if( buf_get_count_params(bufStruct) == 1)

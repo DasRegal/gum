@@ -6,7 +6,7 @@ extern void UsartDebugSendString(const char *pucBuffer);
 
 void HwVoltPrint(void)
 {
-	char buf[56];
+    char buf[56];
     float u[3];
 
     u[0] = (BufADC[HW_ADC_12V] * 48.411 - 110810.7) / 4095;

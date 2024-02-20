@@ -7,10 +7,10 @@
 
 #define MDB_MAX_BUF_LEN                 36
 
-#define MDB_POLL_TIME                   125     /* 25-200 ms. Recmmended 125-200 ms. */
-#define MDB_T_RESPONSE_TIMEOUT          5       /* ms */
-#define MDB_NON_RESP_TIMEOUT            5       /* s, by default */
-#define MDB_T_RESET_TIMEOUT             10      /* s */
+#define MDB_POLL_TIME                   125         /* 25-200 ms. Recmmended 125-200 ms. */
+#define MDB_T_RESPONSE_TIMEOUT          5           /* ms */
+#define MDB_NON_RESP_TIMEOUT            5           /* s, by default */
+#define MDB_T_RESET_TIMEOUT             10          /* s */
 #define MDB_COUNT_NON_RESP              10
 #define MDB_PRODUCT_SELECTION_TIMEOUT   (30 * 1000) /* ms */
 #define MDB_CARD_READ_TIMEOUT           (30 * 1000) /* ms */
@@ -39,12 +39,6 @@
 #define MDB_EXP_WRITE_FILE_SUBCMD       0x02
 #define MDB_EXP_W_TIME_DATA_SUBCMD      0x03
 #define MDB_EXP_OPT_FTR_EN_SUBCMD       0x04
-// #define MDB_EXP_FTL_RX_REQ_SUBCMD   0xFA
-// #define MDB_EXP_FTL_RET_DEN_SUBCMD  0xFB
-// #define MDB_EXP_FTL_TX_BLK_SUBCMD   0xFC
-// #define MDB_EXP_FTL_TX_OK_SUBCMD    0xFD
-// #define MDB_EXP_FTL_TX_REQ_SUBCMD   0xFE
-// #define MDB_EXP_DIAGNOSTICS_SUBCMD  0xFF
 
 typedef enum
 {
@@ -139,19 +133,14 @@ typedef struct
     uint16_t        amount;
 } mdb_dev_t;
 
-//void MdbPrint(void);
-//void MdbBufSend(const uint16_t *pucBuffer, uint8_t len);
-
 void MdbInit(mdv_dev_init_struct_t dev_struct);
 void MdbSetSlaveAddr(uint8_t addr);
 void MdbAckCmd(void);
 void MdbSendCommand(uint8_t cmd, uint8_t subcmd, uint8_t * data);
 mdb_level_t MdbGetLevel(void);
 uint8_t MdbGetNonRespTime(void);
-// void MdbGetCh(uint16_t ch);
 void MdbUsartInit(void);
 uint16_t MdbGetRxCh(uint8_t idx);
-// void MdbClearRx(uint8_t idx);
 mdb_ret_resp_t MdbReceiveChar(uint16_t ch);
 mdb_state_t MdbGetMachineState(void);
 uint16_t MdbGetApprovedAmount(void);

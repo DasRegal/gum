@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include "src/console/console.h"
 
-#define PRINT_OS(s)		UsartDebugSendString(s)
+#define PRINT_OS(s)     UsartDebugSendString(s)
 
 #ifndef GIT_HASH
 #define GIT_HASH "0"

@@ -116,7 +116,6 @@ void CctalkSendData(uint8_t hdr, uint8_t *data, uint8_t size);
 cctalk_master_dev_t *CctalkGetDev(void);
 void CctalkAnswerHandle(void);
 bool CctalkIsEnable(void);
-void CctalkTestFunc(void);
 void CoinBoxGetData(char **buf, uint8_t *len);
 
 #endif /* _CCTALK_H */

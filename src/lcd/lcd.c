@@ -23,13 +23,10 @@
 void vTaskLcdBuf(void *pvParameters);
 void vTaskLcdButton(void *pvParameters);
 
-void vTimerItemSelTimeoutCb( TimerHandle_t xTimer );
-
 static void LcdUartInit(void);
 static void LcdSendString(const char *pucBuffer, uint8_t len);
 EventGroupHandle_t  xLcdButtonEventGroup;
 EventGroupHandle_t  xLcdVendItemGroup;
-// TimerHandle_t xItemSelTimer;
 
 char lcdBuf[LCD_BUF_LEN];
 
@@ -59,7 +56,6 @@ void LcdInit(void)
     LcdUartInit();
 
     fdLcdBuf = xQueueCreate(LCD_BUF_LEN, sizeof(char));
-    // xItemSelTimer = xTimerCreate ( "SelTimeout2", 30000, pdFALSE, ( void * ) 0, vTimerItemSelTimeoutCb );
 
     xTaskCreate(vTaskLcdBuf, (const char*)"Lcd", 300, NULL, tskIDLE_PRIORITY + 2, (TaskHandle_t*)NULL);
     xTaskCreate(vTaskLcdButton, (const char*)"Lcd B", 300, NULL, tskIDLE_PRIORITY + 2, (TaskHandle_t*)NULL);
@@ -85,7 +81,6 @@ void vTaskLcdButton(void *pvParameters)
     DwinReset();
     vTaskDelay(1000);
     DwinSetPage(1);
-    // vTaskDelay(500);
     for(;;)
     {
         vTaskDelay(100);
@@ -115,14 +110,6 @@ void LcdUpdateBalance(uint32_t balance)
     buf[11] = 0x20;
     LcdWrite(0x2000, buf, 6);
 }
-
-// void vTimerItemSelTimeoutCb( TimerHandle_t xTimer )
-// {
-//     xTimerStop(xItemSelTimer, 0);
-//     SatResume();
-//     DwinSetPage(1);
-//     CashlessVendCancelCmd();
-// }
 
 void LcdWrite(uint16_t vp, char *data, uint8_t len)
 {

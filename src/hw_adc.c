@@ -4,11 +4,11 @@ uint16_t BufADC[5];
 
 void HwAdcInit(void)
 {
-	GPIO_InitTypeDef    GPIO_InitStructure = { .GPIO_Speed = GPIO_Speed_2MHz,
+    GPIO_InitTypeDef    GPIO_InitStructure = { .GPIO_Speed = GPIO_Speed_2MHz,
                                                .GPIO_Mode  = GPIO_Mode_AIN };
     DMA_InitTypeDef     DMA_InitStructure;
     ADC_InitTypeDef     ADC_InitStructure;
-    // Тактирование
+    /* Тактирование */
     RCC_APB2PeriphClockCmd( RCC_APB2Periph_AFIO,    ENABLE);
     RCC_APB2PeriphClockCmd( RCC_APB2Periph_ADC1,    ENABLE);
     RCC_AHBPeriphClockCmd ( RCC_AHBPeriph_DMA1,     ENABLE);
@@ -17,7 +17,7 @@ void HwAdcInit(void)
 
     RCC_ADCCLKConfig (RCC_PCLK2_Div6);
 
-    // Настройка портов
+    /* Настройка портов */
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
     GPIO_Init(GPIOB, &GPIO_InitStructure);
 
@@ -31,7 +31,7 @@ void HwAdcInit(void)
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
     GPIO_Init(GPIOC, &GPIO_InitStructure);
 
-    // Настройка DMA
+    /* Настройка DMA */
 
     DMA_DeInit(DMA1_Channel1);
     DMA_InitStructure.DMA_PeripheralBaseAddr    = (uint32_t)&ADC1->DR;
@@ -48,7 +48,7 @@ void HwAdcInit(void)
     DMA_Init(DMA1_Channel1, &DMA_InitStructure);
     DMA_Cmd(DMA1_Channel1, ENABLE);
 
-    // настройки ADC
+    /* настройки ADC */
     ADC_StructInit(&ADC_InitStructure);
     ADC_InitStructure.ADC_Mode                  = ADC_Mode_Independent;
     ADC_InitStructure.ADC_ScanConvMode          = ENABLE;
@@ -59,7 +59,7 @@ void HwAdcInit(void)
     ADC_Init(ADC1, &ADC_InitStructure);
     ADC_Cmd(ADC1, ENABLE);
 
-    // настройка канала
+    /* настройка канала */
     ADC_RegularChannelConfig(ADC1, ADC_Channel_8, 1, ADC_SampleTime_7Cycles5);
     ADC_RegularChannelConfig(ADC1, ADC_Channel_9, 2, ADC_SampleTime_7Cycles5);
     ADC_RegularChannelConfig(ADC1, ADC_Channel_12, 3, ADC_SampleTime_7Cycles5);
@@ -68,7 +68,7 @@ void HwAdcInit(void)
 
     ADC_DMACmd(ADC1, ENABLE);
 
-    // калибровка АЦП
+    /* калибровка АЦП */
     ADC_ResetCalibration(ADC1);
     while (ADC_GetResetCalibrationStatus(ADC1));
     ADC_StartCalibration(ADC1);
@@ -78,6 +78,6 @@ void HwAdcInit(void)
 
     for(int i = 0; i < 100; i++)
     {
-    	asm("NOP");
+        asm("NOP");
     }
 }

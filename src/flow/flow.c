@@ -14,7 +14,7 @@ flow_item_t flow_items[FLOW_ITEMS_MAX] =
     { 0,  120 },
     { 1,  50  },
     { 2,  1   },
-    { 3,  5  },
+    { 3,  5   },
     { 4,  0 },
     { 5,  0 },
     { 6,  0 },
@@ -107,30 +107,6 @@ void FlowVendTimeout(void)
     flow_dev.is_timeout = true;
 }
 
-void FlowInitCycle(void)
-{
-    // LcdUpdateBalance(flow_dev.balance);
-    // DwinSetPage(1);
-}
-
-// void FlowBalanceUpdateCb(void)
-// {
-//     uint32_t    balance = 0;
-
-    // if (CoinBoxIsUpdateBalance(&balance))
-//     {
-//         flow_dev.balance += balance;
-//         LcdUpdateBalance(flow_dev.balance);
-//     }
-
-//     switch(flow_dev.state)
-//     {
-//         case FLOW_STATE_IDLE:
-//             DwinSetPage(1);
-//             break;
-//     }
-// }
-
 void FlowBalanceUpdateCb(uint32_t balance)
 {
 
@@ -154,20 +130,12 @@ static void FlowIdleFunc(void)
     bool        status = false;
     uint32_t    balance = 0;
 
-    // DwinSetPage(1);
-    // LcdUpdateBalance(flow_dev.balance);
-
     status = DwinIsPushButton(&button);
     status |= SatIsPushButton(&button);
     if (!status)
         return;
 
     DwinHandleButton(button);
-
-    // if (CoinBoxIsUpdateBalance(&balance))
-    // {
-    //     flow_dev.balance += balance;
-    // }
 
     status = FlowGetPriceForItem(button & 0xff, &price);
     if (!status)
@@ -202,7 +170,6 @@ static void FlowCashlessEnFunc(void)
     }
     else
     {
-        // DwinSetPage(3);
         SatVend(flow_dev.item);
         flow_dev.state = FLOW_STATE_VEND;
     }
@@ -214,7 +181,6 @@ static void FlowVendRequest(void)
 {
     if (CashlessIsVendApproved(NULL) || !is_cashless_use)
     {
-        // DwinSetPage(3);
         SatVend(flow_dev.item);
         flow_dev.state = FLOW_STATE_VEND;
         return;
@@ -222,7 +188,7 @@ static void FlowVendRequest(void)
 
     if (FlowIsTimeout())
     {
-        // DwinSetPage(1);
+        DwinSetPage(1);
         flow_dev.state = FLOW_STATE_IDLE;
     }
 

@@ -1,11 +1,7 @@
 #include "vsp.h"
 vsp_dev_t vsp_dev;
 
-// static void VspLatchOut(bool enable);
-// static void VspLatchIn(bool enable);
 static void VspCs(uint8_t idx, bool enable);
-// static void VspClk(bool enable);
-// static void VspClk(bool enable);
 
 void VspInit(vsp_dev_t dev_struct)
 {
@@ -30,22 +26,6 @@ void VspInit(vsp_dev_t dev_struct)
     }
 }
 
-// static void VspLatchOut(bool enable)
-// {
-//     if (vsp_dev.cb_latch_out == NULL)
-//         return;
-
-//     vsp_dev.cb_latch_out(enable);
-// }
-
-// static void VspLatchIn(bool enable)
-// {
-//     if (vsp_dev.cb_latch_in == NULL)
-//         return;
-
-//     vsp_dev.cb_latch_in(enable);
-// }
-
 static void VspCs(uint8_t idx, bool enable)
 {
     if (idx >= VSP_MAX_ITEMS)
@@ -55,14 +35,6 @@ static void VspCs(uint8_t idx, bool enable)
 
     vsp_dev.item[idx].cb_cs(enable);
 }
-
-// static void VspClk(bool enable)
-// {
-//     if (vsp_dev.cb_clk == NULL)
-//         return;
-
-//     vsp_dev.cb_clk(enable);
-// }
 
 void VspEnable(uint8_t idx, bool enable)
 {
@@ -110,9 +82,6 @@ void VspMotorCtrl(uint8_t idx, bool enable)
     vsp_dev.cb_latch_in(vsp_dev.item[idx].state.motor);
     vsp_dev.cb_latch_out(vsp_dev.item[idx].state.led);
     vsp_dev.cb_clk(vsp_dev.item[idx].state.inhibit);
-    // VspLatchIn(vsp_dev.item[idx].state.motor);
-    // VspLatchOut(vsp_dev.item[idx].state.led);
-    // VspClk(vsp_dev.item[idx].state.inhibit);
     VspCs(idx, true);
     VspCs(idx, false);
 }
@@ -130,7 +99,6 @@ void VspLedCtrl(uint8_t idx, bool enable)
     vsp_dev.cb_latch_out(vsp_dev.item[idx].state.led);
     vsp_dev.cb_clk(vsp_dev.item[idx].state.inhibit);
 
-    // VspLatchOut(enable);
     VspCs(idx, true);
     VspCs(idx, false);
 }
@@ -149,8 +117,6 @@ void VspInhibitCtrl(uint8_t idx, bool enable)
     vsp_dev.cb_clk(vsp_dev.item[idx].state.inhibit);
 
     VspCs(idx, true);
-    // VspClk(enable);
-    // VspCs(idx, false);
 }
 
 bool VspCheck(uint8_t idx)

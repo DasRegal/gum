@@ -137,131 +137,64 @@ void vTaskSatellitePoll (void *pvParameters)
     VspEnable(2, true);
     VspEnable(3, true);
     EventBits_t flags;
-    // VspBlock(3, true);
     for( ;; )
     {
         xSemaphoreTake(sat_block_poll_sem, portMAX_DELAY);
-        // if (xSemaphoreTake(sat_block_poll_sem, 60000) == pdPASS)
-        // {
-            uint8_t item = VspGetSelectItem();
-            if(item < VSP_MAX_ITEMS)
-            {
-                xSemaphoreTake(xVendMutex, portMAX_DELAY);
-                is_vend = 1;
-                xSemaphoreGive(xVendMutex);
+        uint8_t item = VspGetSelectItem();
+        if(item < VSP_MAX_ITEMS)
+        {
+            xSemaphoreTake(xVendMutex, portMAX_DELAY);
+            is_vend = 1;
+            xSemaphoreGive(xVendMutex);
 
-                // DwinSetPage(1);
+            xSemaphoreTake(xItemMutex, portMAX_DELAY);
+                VspMotorCtrl(item, false);
 
-                xSemaphoreTake(xItemMutex, portMAX_DELAY);
-                    VspMotorCtrl(item, false);
-
-                    VspInhibitCtrl(item, false);
-                    for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
-                    {
-                        VspDeselectItem(idx);
-                    }
-                xSemaphoreGive(xItemMutex);
-
-                vTaskResume(ledstream_handler);
-            }
-
-            for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
-            {
-                xSemaphoreTake(xItemMutex, portMAX_DELAY);
-                    VspCheck(idx);
-                xSemaphoreGive(xItemMutex);
-            }
-
-            /* Start from buttons */
-            // for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
-            // {
-            //     xSemaphoreTake(xItemMutex, portMAX_DELAY);
-            //     bool is_push = VspButton(idx);
-            //     xSemaphoreGive(xItemMutex);
-            //     if (is_push)
-            //     {
-            //         vTaskSuspend(ledstream_handler);
-            //         xSemaphoreTake(xItemMutex, portMAX_DELAY);
-            //             VspSelectItem(idx);
-            //         xSemaphoreGive(xItemMutex);
-
-            //         // xSemaphoreTake(xItemMutex, portMAX_DELAY);
-            //         // VspInhibitCtrl(idx, true);
-            //         // VspMotorCtrl(idx, true);
-            //         // xSemaphoreGive(xItemMutex);
-
-            //         break;
-            //     }
-            // }
-
-            /* Start from LCD buttons */
-            flags = xEventGroupGetBits(xLcdButtonEventGroup);
-            if (flags)
-            {
+                VspInhibitCtrl(item, false);
                 for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
                 {
-                    if ( flags & (1 << idx))
-                    {
-                        xEventGroupClearBits(xLcdButtonEventGroup, (1 << idx));
-                        
-                        vTaskSuspend(ledstream_handler);
+                    VspDeselectItem(idx);
+                }
+            xSemaphoreGive(xItemMutex);
 
-                        xSemaphoreTake(xItemMutex, portMAX_DELAY);
-                            VspSelectItem(idx);
-                        xSemaphoreGive(xItemMutex);
+            vTaskResume(ledstream_handler);
+        }
 
-                        // xSemaphoreTake(xItemMutex, portMAX_DELAY);
-                        // VspInhibitCtrl(idx, true);
-                        // VspMotorCtrl(idx, true);
-                        // xSemaphoreGive(xItemMutex);
+        for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
+        {
+            xSemaphoreTake(xItemMutex, portMAX_DELAY);
+                VspCheck(idx);
+            xSemaphoreGive(xItemMutex);
+        }
 
+        /* Start from LCD buttons */
+        flags = xEventGroupGetBits(xLcdButtonEventGroup);
+        if (flags)
+        {
+            for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
+            {
+                if ( flags & (1 << idx))
+                {
+                    xEventGroupClearBits(xLcdButtonEventGroup, (1 << idx));
+                    
+                    vTaskSuspend(ledstream_handler);
+
+                    xSemaphoreTake(xItemMutex, portMAX_DELAY);
+                        VspSelectItem(idx);
+                    xSemaphoreGive(xItemMutex);
                     break;
-                    }
                 }
             }
+        }
 
+        /* If pushed the button */
+        if(VspGetSelectItem() < VSP_MAX_ITEMS)
+        {
+            continue;
+        }
 
-            /* If pushed the button */
-            if(VspGetSelectItem() < VSP_MAX_ITEMS)
-            {
-                continue;
-            }
-
-            vTaskDelay(100);
-            xSemaphoreGive(sat_block_poll_sem);
-        // }
-        // else
-        // {
-        //     xSemaphoreTake(xVendMutex, portMAX_DELAY);
-        //         is_vend = 2;
-        //     xSemaphoreGive(xVendMutex);
-
-
-        //     // uint8_t item = VspGetSelectItem();
-        //     // xSemaphoreTake(xItemMutex, portMAX_DELAY);
-        //     // VspInhibitCtrl(item, false);
-        //     // SatContinuePoll();
-        //     // xSemaphoreGive(xItemMutex);
-        //     // vTaskResume(ledstream_handler);
-
-        //     // DwinSetPage(1);
-
-        //     xSemaphoreTake(xItemMutex, portMAX_DELAY);
-        //         uint8_t item = VspGetSelectItem();
-        //         VspMotorCtrl(item, false);
-
-        //         VspInhibitCtrl(item, false);
-        //         for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
-        //         {
-        //             VspDeselectItem(idx);
-        //         }
-        //     xSemaphoreGive(xItemMutex);
-            
-        //     vTaskResume(ledstream_handler);
-            
-        //     xSemaphoreGive(sat_block_poll_sem);
-        // }
-
+        vTaskDelay(100);
+        xSemaphoreGive(sat_block_poll_sem);
     }
 }
 
@@ -308,38 +241,12 @@ void SatVendTimeout(void)
     xSemaphoreGive(sat_block_poll_sem);
 }
 
-// void SatResume(void)
-// {
-//     for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
-//     {
-//         VspDeselectItem(idx);
-//     }
-//     xSemaphoreGive(xItemMutex);
-//     vTaskResume(ledstream_handler);
-    
-//     xSemaphoreGive(sat_block_poll_sem);
-// }
-
 void SatVend(uint8_t item)
 {
-    // EventBits_t flags;
-    // flags = xEventGroupGetBits(xLcdVendItemGroup);
-    // if (flags)
-    // {
-    //     for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
-    //     {
-    //         if ( flags & (1 << idx))
-    //         {
-                // xEventGroupClearBits(xLcdVendItemGroup, (1 << idx));
-                
-                xSemaphoreTake(xItemMutex, portMAX_DELAY);
-                    VspInhibitCtrl(item, true);
-                    VspMotorCtrl(item, true);
-                xSemaphoreGive(xItemMutex);
-    //         break;
-    //         }
-    //     }
-    // }
+    xSemaphoreTake(xItemMutex, portMAX_DELAY);
+        VspInhibitCtrl(item, true);
+        VspMotorCtrl(item, true);
+    xSemaphoreGive(xItemMutex);
 }
 
 uint8_t SatIsVendOk(void)
@@ -408,18 +315,6 @@ void vTaskLedStream (void *pvParameters)
     }
 }
 
-void SatContinuePoll(void)
-{
-    // // if(VspGetSelectItem() == VSP_MAX_ITEMS)
-    // //     return;
-
-    // for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
-    // {
-    //     VspDeselectItem(idx);
-    // }
-    // xSemaphoreGive(sat_block_poll_sem);
-}
-
 uint8_t SatGetPushButton(void)
 {
     return VspGetSelectItem();
@@ -433,15 +328,17 @@ static void SatInitPeriph(void)
                                             .NVIC_IRQChannelSubPriority        = 0,
                                             .NVIC_IRQChannelCmd                = ENABLE};
 
-    // SPI_InitTypeDef SPI_InitStructure   = { .SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_256,
-    //                                         .SPI_CPHA              = SPI_CPHA_1Edge,
-    //                                         .SPI_CPOL              = SPI_CPOL_Low,
-    //                                         .SPI_DataSize          = SPI_DataSize_8b,
-    //                                         .SPI_Direction         = SPI_Direction_2Lines_FullDuplex,
-    //                                         .SPI_FirstBit          = SPI_FirstBit_MSB,
-    //                                         .SPI_Mode              = SPI_Mode_Master,
-    //                                         .SPI_NSS               = SPI_NSS_Soft,
-    //                                         .SPI_CRCPolynomial     = 7};
+/*
+    SPI_InitTypeDef SPI_InitStructure   = { .SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_256,
+                                            .SPI_CPHA              = SPI_CPHA_1Edge,
+                                            .SPI_CPOL              = SPI_CPOL_Low,
+                                            .SPI_DataSize          = SPI_DataSize_8b,
+                                            .SPI_Direction         = SPI_Direction_2Lines_FullDuplex,
+                                            .SPI_FirstBit          = SPI_FirstBit_MSB,
+                                            .SPI_Mode              = SPI_Mode_Master,
+                                            .SPI_NSS               = SPI_NSS_Soft,
+                                            .SPI_CRCPolynomial     = 7};
+*/
 
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
     RCC_APB2PeriphClockCmd( SAT_MOSI_RCC        |
@@ -482,7 +379,7 @@ static void SatInitPeriph(void)
     GPIO_InitStructure.GPIO_Pin = SAT_MISO_PIN;
     GPIO_Init(SAT_MISO_PORT, &GPIO_InitStructure);
     /* MOSI */
-    // GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+    /*GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;*/
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
     GPIO_InitStructure.GPIO_Pin = SAT_MOSI_PIN;
     GPIO_Init(SAT_MOSI_PORT, &GPIO_InitStructure);
@@ -521,9 +418,6 @@ static void SatInitPeriph(void)
     GPIO_SetBits(SAT_CS2_PORT, SAT_CS2_PIN);
     GPIO_SetBits(SAT_CS3_PORT, SAT_CS3_PIN);
     GPIO_SetBits(SAT_CS4_PORT, SAT_CS4_PIN);
-
-    // SPI_Init(SPI2, &SPI_InitStructure);
-    // SPI_Cmd(SPI2, ENABLE);
 
     GPIO_EXTILineConfig(SAT_INT_PORT_SRC, SAT_INT_PIN_SRC);
 

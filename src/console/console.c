@@ -33,7 +33,6 @@ void vTaskConsoleRecBuf(void *pvParameters)
     QueueHandle_t fdBuferConsoleRec;
     fdBuferConsoleRec = (QueueHandle_t*)pvParameters;
 
-
     for(;;)
     {
         if (xQueueReceive(fdBuferConsoleRec, &ch, portMAX_DELAY) == pdPASS)
@@ -43,7 +42,7 @@ void vTaskConsoleRecBuf(void *pvParameters)
     }
 }
 
-void ConsoleInit(/*QueueHandle_t fdBuferConsoleRec*/)
+void ConsoleInit(void)
 {
     fdBuferConsoleRec = xQueueCreate(512, sizeof(uint8_t));
 
