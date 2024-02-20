@@ -146,15 +146,15 @@ static SemaphoreHandle_t cl_ack_sem;
 static SemaphoreHandle_t xCurActMutex;
 TimerHandle_t xNonResponseTimer;
 TimerHandle_t xTResponseTimer;
-TimerHandle_t xProductSelectionTimer;
-TimerHandle_t xCardReadTimer;
+// TimerHandle_t xProductSelectionTimer;
+// TimerHandle_t xCardReadTimer;
 
 void vTaskCLRx(void *pvParameters);
 void vTaskCLTx(void *pvParameters);
 void vTimerNonRespCb( TimerHandle_t xTimer );
 void vTimerTRespCb( TimerHandle_t xTimer );
-void vTimerProductSelectionTimeoutCb( TimerHandle_t xTimer );
-void vTimerCardReadTimeoutCb( TimerHandle_t xTimer );
+// void vTimerProductSelectionTimeoutCb( TimerHandle_t xTimer );
+// void vTimerCardReadTimeoutCb( TimerHandle_t xTimer );
 
 static void CashlessStateReset(void);
 static void CashlessStatePoll(void);
@@ -196,8 +196,8 @@ void CashlessInit(void)
     fdCashlessBufRx = xQueueCreate(256, sizeof(uint16_t));
     xNonResponseTimer = xTimerCreate ( "NonRespTimer", MDB_NON_RESP_TIMEOUT * 1000, pdFALSE, ( void * ) 0, vTimerNonRespCb );
     xTResponseTimer = xTimerCreate ( "TRespTimer", MDB_T_RESPONSE_TIMEOUT + 3, pdFALSE, ( void * ) 0, vTimerTRespCb );
-    xProductSelectionTimer = xTimerCreate ( "SelTimeout", MDB_PRODUCT_SELECTION_TIMEOUT, pdFALSE, ( void * ) 0, vTimerProductSelectionTimeoutCb );
-    xCardReadTimer = xTimerCreate ( "CardTimeout", MDB_CARD_READ_TIMEOUT, pdFALSE, ( void * ) 0, vTimerCardReadTimeoutCb );
+    // xProductSelectionTimer = xTimerCreate ( "SelTimeout", MDB_PRODUCT_SELECTION_TIMEOUT, pdFALSE, ( void * ) 0, vTimerProductSelectionTimeoutCb );
+    // xCardReadTimer = xTimerCreate ( "CardTimeout", MDB_CARD_READ_TIMEOUT, pdFALSE, ( void * ) 0, vTimerCardReadTimeoutCb );
 
     mdv_dev_init_struct_t mdb_dev_struct;
     mdb_dev_struct.send_callback = MdbBufSend;
@@ -275,7 +275,7 @@ void vTaskCLRx(void *pvParameters)
                     xSemaphoreGive(cl_ack_sem);
                     break;
                 case MDB_RET_BEGIN_SESSION:
-                    xTimerStart(xProductSelectionTimer, 0);
+                    // xTimerStart(xProductSelectionTimer, 0);
                     xSemaphoreGive(cl_ack_sem);
                     break;
                 case MDB_RET_SESS_CANCEL:
@@ -283,12 +283,12 @@ void vTaskCLRx(void *pvParameters)
                     xSemaphoreGive(cl_ack_sem);
                     break;
                 case MDB_RET_VEND_APPROVED:
-                    xTimerStop(xCardReadTimer, 0);
+                    // xTimerStop(xCardReadTimer, 0);
                     CashlessStateVendApproved();
                     xSemaphoreGive(cl_ack_sem);
                     break;
                 case MDB_RET_VEND_DENIED:
-                    xTimerStop(xCardReadTimer, 0);
+                    // xTimerStop(xCardReadTimer, 0);
                     action = CL_ST_SES_CMPL;
                     CashlessStateVendDenied();
                     xSemaphoreGive(cl_ack_sem);
@@ -433,7 +433,7 @@ void vTaskCLTx(void *pvParameters)
                 CashlessStateDisable();
                 break;
             case CL_ST_VEND_REQ:
-                xTimerStart(xCardReadTimer, 0);
+                // xTimerStart(xCardReadTimer, 0);
                 CashlessStateVendRequest();
                 break;
             case CL_ST_SES_CMPL:
@@ -531,7 +531,7 @@ static void CashlessStateVendRequest(void)
     buf[2] = (cashless_dev.item >> 8) & 0xFF;
     buf[3] = cashless_dev.item & 0xFF;
 
-    xTimerStop(xProductSelectionTimer, 0);
+    // xTimerStop(xProductSelectionTimer, 0);
     MdbSendCommand(MDB_VEND_CMD_E, MDB_VEND_REQ_SUBCMD, buf);
 }
 
@@ -872,15 +872,15 @@ void vTimerTRespCb( TimerHandle_t xTimer )
     MdbBufSend(NULL, 0);
 }
 
-void vTimerProductSelectionTimeoutCb( TimerHandle_t xTimer )
-{
-    xTimerStop(xProductSelectionTimer, 0);
-}
+// void vTimerProductSelectionTimeoutCb( TimerHandle_t xTimer )
+// {
+//     xTimerStop(xProductSelectionTimer, 0);
+// }
 
-void vTimerCardReadTimeoutCb( TimerHandle_t xTimer )
-{
-    xTimerStop(xCardReadTimer, 0);
-}
+// void vTimerCardReadTimeoutCb( TimerHandle_t xTimer )
+// {
+//     xTimerStop(xCardReadTimer, 0);
+// }
 
 uint8_t isTimerStart = 0;
 static void MdbBufSend(const uint16_t *pucBuffer, uint8_t len)

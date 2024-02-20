@@ -82,6 +82,7 @@ typedef struct
 {
     uint8_t event;
     uint8_t balance;
+    bool    is_first_event;
 } cctalk_credit_t;
 
 typedef struct

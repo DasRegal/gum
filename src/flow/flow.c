@@ -4,15 +4,17 @@
 #include "src/mdb/cashless.h"
 #include "src/lcd/lcd.h"
 #include "satellite.h"
+#include "coinbox.h"
 
 flow_dev_t flow_dev;
+static bool is_cashless_use = false;
 
 flow_item_t flow_items[FLOW_ITEMS_MAX] =
 {
     { 0,  120 },
     { 1,  50  },
     { 2,  1   },
-    { 3,  40  },
+    { 3,  5  },
     { 4,  0 },
     { 5,  0 },
     { 6,  0 },
@@ -107,8 +109,42 @@ void FlowVendTimeout(void)
 
 void FlowInitCycle(void)
 {
-    LcdUpdateBalance(flow_dev.balance);
-    DwinSetPage(1);
+    // LcdUpdateBalance(flow_dev.balance);
+    // DwinSetPage(1);
+}
+
+// void FlowBalanceUpdateCb(void)
+// {
+//     uint32_t    balance = 0;
+
+    // if (CoinBoxIsUpdateBalance(&balance))
+//     {
+//         flow_dev.balance += balance;
+//         LcdUpdateBalance(flow_dev.balance);
+//     }
+
+//     switch(flow_dev.state)
+//     {
+//         case FLOW_STATE_IDLE:
+//             DwinSetPage(1);
+//             break;
+//     }
+// }
+
+void FlowBalanceUpdateCb(uint32_t balance)
+{
+
+    flow_dev.balance += balance;
+
+    switch(flow_dev.state)
+    {
+        case FLOW_STATE_IDLE:
+            LcdUpdateBalance(flow_dev.balance);
+            DwinSetPage(1);
+            break;
+    }
+
+    return false;
 }
 
 static void FlowIdleFunc(void)
@@ -116,12 +152,22 @@ static void FlowIdleFunc(void)
     uint16_t    button;
     uint32_t    price;
     bool        status = false;
+    uint32_t    balance = 0;
+
+    // DwinSetPage(1);
+    // LcdUpdateBalance(flow_dev.balance);
 
     status = DwinIsPushButton(&button);
+    status |= SatIsPushButton(&button);
     if (!status)
         return;
 
     DwinHandleButton(button);
+
+    // if (CoinBoxIsUpdateBalance(&balance))
+    // {
+    //     flow_dev.balance += balance;
+    // }
 
     status = FlowGetPriceForItem(button & 0xff, &price);
     if (!status)
@@ -129,11 +175,13 @@ static void FlowIdleFunc(void)
 
     if (flow_dev.balance >= price)
     {
-        flow_dev.state = FLOW_STATE_VEND;
+        flow_dev.state = FLOW_STATE_CASHLESS_EN;
+        is_cashless_use = false;
         return;
     }
 
     flow_dev.state = FLOW_STATE_CASHLESS_EN;
+    is_cashless_use = true;
     return;
 }
 
@@ -146,17 +194,27 @@ static void FlowCashlessEnFunc(void)
     price = flow_dev.items[item].price - flow_dev.balance;
     DwinSetPage(2);
     SatPushLcdButton(flow_dev.items[item].button);
-    CashlessVendRequest(price, item);
-    flow_dev.state = FLOW_STATE_VEND_REQUEST;
+
+    if (is_cashless_use)
+    {
+        CashlessVendRequest(price, item);
+        flow_dev.state = FLOW_STATE_VEND_REQUEST;
+    }
+    else
+    {
+        // DwinSetPage(3);
+        SatVend(flow_dev.item);
+        flow_dev.state = FLOW_STATE_VEND;
+    }
 
     return;
 }
 
 static void FlowVendRequest(void)
 {
-    if (CashlessIsVendApproved(NULL))
+    if (CashlessIsVendApproved(NULL) || !is_cashless_use)
     {
-        DwinSetPage(3);
+        // DwinSetPage(3);
         SatVend(flow_dev.item);
         flow_dev.state = FLOW_STATE_VEND;
         return;
@@ -164,7 +222,7 @@ static void FlowVendRequest(void)
 
     if (FlowIsTimeout())
     {
-        DwinSetPage(1);
+        // DwinSetPage(1);
         flow_dev.state = FLOW_STATE_IDLE;
     }
 
@@ -173,6 +231,8 @@ static void FlowVendRequest(void)
 static void FlowVendItem(void)
 {
     uint8_t res = 1;
+
+    DwinSetPage(3);
     
     res = SatIsVendOk();
     
@@ -184,14 +244,36 @@ static void FlowVendItem(void)
     switch(res)
     {
         case 1:
-            flow_dev.balance = 0;
-            CashlessVendSuccessCmd(0);
+            if (is_cashless_use)
+            {
+                flow_dev.balance = 0;
+                CashlessVendSuccessCmd(0);
+            }
+            else
+            {
+                uint32_t price;
+                uint8_t  item;
+
+                item = flow_dev.item;
+                price = flow_dev.items[item].price;
+                if (flow_dev.balance >= price)
+                {
+                    flow_dev.balance -= price;
+                }
+                else
+                {
+                    flow_dev.balance = 0;
+                }
+            }
             LcdUpdateBalance(flow_dev.balance);
             DwinSetPage(1);
             flow_dev.state = FLOW_STATE_IDLE;
             break;
         case 2:
-            CashlessVendFailureCmd();
+            if (is_cashless_use)
+            {
+                CashlessVendFailureCmd();
+            }
             LcdUpdateBalance(flow_dev.balance);
             DwinSetPage(1);
             flow_dev.state = FLOW_STATE_IDLE;

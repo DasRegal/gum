@@ -8,14 +8,18 @@
 #include "queue.h"
 #include "event_groups.h"
 #include "timers.h"
+#include "semphr.h"
 
 #include "main.h"
 
 #include "coinbox.h"
+#include "src/flow/flow.h"
 
 #define CCTALK_CLI_CMD_FLAG     (1)
 
 EventGroupHandle_t  xCCTalkEventGroup;
+SemaphoreHandle_t   xBalanceMutex;
+static bool is_balance_change = false;
 
 typedef struct
 {
@@ -38,24 +42,36 @@ void vTaskCctalk(void *pvParameters)
 {
     uint8_t ch;
     QueueHandle_t fdBuferCctalk;
+    cctalk_master_dev_t *dev;
+
+    dev = CctalkGetDev();
+
     fdBuferCctalk = (QueueHandle_t*)pvParameters;
     for(;;)
     {
         if (xQueueReceive(fdBuferCctalk, &ch, portMAX_DELAY) == pdPASS)
         {
-            if(CctalkGetCharHandler(ch))
-            {
-                // header = CoinBoxGetHeader();
-                // switch(header)
-                // {
-                //     case CCTALK_HDR_READ_BUF_CREDIT:
-                //         break;
-                //     default:
-                //         break;
-                // }
+            xSemaphoreTake(xBalanceMutex, portMAX_DELAY);
+                if(CctalkGetCharHandler(ch))
+                {
+                        if (dev->credit.balance)
+                        {
+                            is_balance_change = true;
+                            FlowBalanceUpdateCb(dev->credit.balance);
+                            dev->credit.balance = 0;
+                        }
+                    // header = CoinBoxGetHeader();
+                    // switch(header)
+                    // {
+                    //     case CCTALK_HDR_READ_BUF_CREDIT:
+                    //         break;
+                    //     default:
+                    //         break;
+                    // }
 
-                CctalkAnswerHandle();
-            }
+                    CctalkAnswerHandle();
+                }
+            xSemaphoreGive(xBalanceMutex);
         }
     }
 }
@@ -87,10 +103,26 @@ void CoinBoxGetData(char **buf, uint8_t *len)
 //     // }
 // }
 
-// bool CoinBoxIsUpdateBalance(uint32_t *balance)
-// {
+bool CoinBoxIsUpdateBalance(uint32_t *balance)
+{
+    cctalk_master_dev_t *dev;
+    uint32_t val;
 
-// }
+    dev = CctalkGetDev();
+
+    xSemaphoreTake(xBalanceMutex, portMAX_DELAY);
+        if (!is_balance_change)
+        {
+            return false;
+        }
+
+        is_balance_change = false;
+        val = dev->credit.balance;
+        dev->credit.balance = 0;
+        *balance = val;
+    xSemaphoreGive(xBalanceMutex);
+    return true;
+}
 
 void vTaskCoinBoxPoll ( void *pvParameters)
 {
@@ -112,32 +144,16 @@ void vTaskCoinBoxPoll ( void *pvParameters)
     CctalkSendData(CCTALK_HDR_REQ_INH_STAT, NULL, 0);
     vTaskDelay(200);
 
-    data[0] = 1;
-    CctalkSendData(184, data, 1);
-    vTaskDelay(200);
-
-    data[0] = 2;
-    CctalkSendData(184, data, 1);
-    vTaskDelay(200);
-        data[0] = 3;
-    CctalkSendData(184, data, 1);
-    vTaskDelay(200);
-        data[0] = 4;
-    CctalkSendData(184, data, 1);
-    vTaskDelay(200);
-        data[0] = 5;
-    CctalkSendData(184, data, 1);
-    vTaskDelay(200);
-        data[0] = 6;
-    CctalkSendData(184, data, 1);
-    vTaskDelay(200);
-        data[0] = 7;
-    CctalkSendData(184, data, 1);
-    vTaskDelay(200);
-        data[0] = 8;
-    CctalkSendData(184, data, 1);
-    vTaskDelay(200);
-
+    // data[0] = 7;
+    // CoinBoxCliCmdSendData(CCTALK_HDR_REQ_COIN_ID, data, 1);
+    // 1 RU100A
+    // 2 RU100B
+    // 3 RU200A
+    // 4 RU200B
+    // 5 RU500A
+    // 6 RU500B
+    // 7 RU1K0A
+    // 8 RU1K0B
     for( ;; )
     {
         flags = xEventGroupGetBits(xCCTalkEventGroup);
@@ -182,7 +198,9 @@ void CoinBoxInit(void)
     xCCTalkEventGroup = xEventGroupCreate();
     // vSemaphoreCreateBinary(cctalk_transfer_sem);
 
-    xTaskCreate(vTaskCctalk, (const char*)"cctalk", 256, (void*)fdBuferCctalk, tskIDLE_PRIORITY + 1, (TaskHandle_t*)NULL);
+    xBalanceMutex = xSemaphoreCreateMutex();
+
+    xTaskCreate(vTaskCctalk, (const char*)"cctalk", 500, (void*)fdBuferCctalk, tskIDLE_PRIORITY + 1, (TaskHandle_t*)NULL);
     xTaskCreate(vTaskCoinBoxPoll, (const char*)"CctalkPoll", 256, NULL, tskIDLE_PRIORITY + 1, (TaskHandle_t*)NULL);
 }
 

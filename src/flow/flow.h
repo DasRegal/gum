@@ -45,6 +45,7 @@ bool FlowCycle(flow_state_t *state);
 void LcdUpdateBalance(uint32_t balance);
 void FlowInitCycle(void);
 void FlowVendTimeout(void);
+void FlowBalanceUpdateCb(uint32_t balance);
 // void (*session_cancel_cb)(void);
 
 #endif /* _FLOW_H */

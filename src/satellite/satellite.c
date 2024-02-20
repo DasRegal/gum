@@ -110,7 +110,7 @@ void SatInit(void)
     xTaskCreate(
         vTaskSatellitePoll,
         "Satellite",
-        256,
+        300,
         (void*)NULL,
         tskIDLE_PRIORITY + 2,
         NULL
@@ -119,7 +119,7 @@ void SatInit(void)
     xTaskCreate(
         vTaskLedStream,
         "LedStream",
-        256,
+        300,
         (void*)NULL,
         tskIDLE_PRIORITY + 2,
         &ledstream_handler
@@ -181,12 +181,14 @@ void vTaskSatellitePoll (void *pvParameters)
             //     if (is_push)
             //     {
             //         vTaskSuspend(ledstream_handler);
-            //         VspSelectItem(idx);
-
             //         xSemaphoreTake(xItemMutex, portMAX_DELAY);
-            //         VspInhibitCtrl(idx, true);
-            //         VspMotorCtrl(idx, true);
+            //             VspSelectItem(idx);
             //         xSemaphoreGive(xItemMutex);
+
+            //         // xSemaphoreTake(xItemMutex, portMAX_DELAY);
+            //         // VspInhibitCtrl(idx, true);
+            //         // VspMotorCtrl(idx, true);
+            //         // xSemaphoreGive(xItemMutex);
 
             //         break;
             //     }
@@ -266,6 +268,22 @@ void vTaskSatellitePoll (void *pvParameters)
 void SatPushLcdButton(uint8_t button)
 {
     xEventGroupSetBits(xLcdButtonEventGroup, (1 << button));
+}
+
+bool SatIsPushButton(uint16_t *button)
+{
+    for (size_t idx = 0; idx < VSP_MAX_ITEMS; idx++)
+    {
+        xSemaphoreTake(xItemMutex, portMAX_DELAY);
+        bool is_push = VspButton(idx);
+        xSemaphoreGive(xItemMutex);
+        if (is_push)
+        {
+            *button = idx;
+            return true;
+        }
+    }
+    return false;
 }
 
 void SatVendTimeout(void)
@@ -464,7 +482,8 @@ static void SatInitPeriph(void)
     GPIO_InitStructure.GPIO_Pin = SAT_MISO_PIN;
     GPIO_Init(SAT_MISO_PORT, &GPIO_InitStructure);
     /* MOSI */
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+    // GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
     GPIO_InitStructure.GPIO_Pin = SAT_MOSI_PIN;
     GPIO_Init(SAT_MOSI_PORT, &GPIO_InitStructure);
     /* CS1 */

@@ -128,6 +128,7 @@ int CctalkInit(cctalk_master_dev_t dev)
     cctalk_dev.state = CCTALK_STATE_DST_ADDR;
     cctalk_dev.credit.event = 0;
     cctalk_dev.credit.balance = 0;
+    cctalk_dev.credit.is_first_event = true;
 
     return 0;
 }
@@ -261,10 +262,25 @@ bool CctalkGetCharHandler(uint8_t ch)
     {
         uint8_t hdr = cctalk_dev.buf_tx[3];
 
+
         switch(hdr)
         {
             case CCTALK_HDR_READ_BUF_CREDIT:
+                if (cctalk_dev.credit.is_first_event)
+                {
+                    cctalk_dev.credit.is_first_event = false;
+                    cctalk_dev.credit.event = cctalk_dev.buf[0];
+                    break;
+                }
+
+                if (cctalk_dev.credit.event == cctalk_dev.buf[0])
+                {
+                    break;
+                }
+
                 CctalkUpdateBalance();
+                break;
+            case CCTALK_HDR_REQ_COIN_ID:
                 break;
             default:
                 break;
@@ -282,6 +298,7 @@ static void CctalkUpdateBalance(void)
     uint8_t last_event;
     uint8_t res;
     uint8_t idx;
+    uint8_t mult;
 
     struct
     {
@@ -305,6 +322,29 @@ static void CctalkUpdateBalance(void)
         cr[i].sorter = cctalk_dev.buf[idx + 1];
     }
 
+    switch(cr[0].coin)
+    {
+        case 1:
+        case 2:
+            mult = 1;
+            break;
+        case 3:
+        case 4:
+            mult = 2;
+            break;
+        case 5:
+        case 6:
+            mult = 5;
+            break;
+        case 7:
+        case 8:
+            mult = 10;
+            break;
+        default:
+            mult = 1;
+    }
+
+    cctalk_dev.credit.balance += 1 * mult;
 }
 
 cctalk_master_dev_t *CctalkGetDev(void)

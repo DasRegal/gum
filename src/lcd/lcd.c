@@ -61,8 +61,8 @@ void LcdInit(void)
     fdLcdBuf = xQueueCreate(LCD_BUF_LEN, sizeof(char));
     // xItemSelTimer = xTimerCreate ( "SelTimeout2", 30000, pdFALSE, ( void * ) 0, vTimerItemSelTimeoutCb );
 
-    xTaskCreate(vTaskLcdBuf, (const char*)"Lcd", 256, NULL, tskIDLE_PRIORITY + 2, (TaskHandle_t*)NULL);
-    xTaskCreate(vTaskLcdButton, (const char*)"Lcd B", 256, NULL, tskIDLE_PRIORITY + 2, (TaskHandle_t*)NULL);
+    xTaskCreate(vTaskLcdBuf, (const char*)"Lcd", 300, NULL, tskIDLE_PRIORITY + 2, (TaskHandle_t*)NULL);
+    xTaskCreate(vTaskLcdButton, (const char*)"Lcd B", 300, NULL, tskIDLE_PRIORITY + 2, (TaskHandle_t*)NULL);
 }
 
 void vTaskLcdBuf(void *pvParameters)
@@ -108,7 +108,7 @@ void LcdUpdateBalance(uint32_t balance)
     buf[2] = 0;
     buf[3] = (p_x100 || p_x10) ? 0x30 + p_x10 : 0x20;
     buf[4] = 0;
-    buf[5] = (p_x100 || p_x10 || p_x1) ? 0x30 + p_x1 : 0x20;
+    buf[5] = 0x30 + p_x1;
 
     buf[7] = 0x20;
     buf[9] = 0x20;

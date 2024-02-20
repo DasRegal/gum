@@ -297,7 +297,7 @@ void MdbOsInit(void)
     xTaskCreate(
         vTaskMdbRecBuf,
         "MdbRecBuf",
-        256,
+        300,
         (void*)fdBuferMdbRec,
         tskIDLE_PRIORITY + 2,
         NULL
@@ -306,7 +306,7 @@ void MdbOsInit(void)
     xTaskCreate(
         vTaskMdbPoll,
         "MdbPoll",
-        256,
+        300,
         NULL,
         tskIDLE_PRIORITY + 1,
         NULL
