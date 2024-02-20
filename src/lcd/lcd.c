@@ -76,8 +76,6 @@ void vTaskLcdBuf(void *pvParameters)
 
 void vTaskLcdButton(void *pvParameters)
 {
-    uint16_t button;
-    char b1[6] = { 0x00, 0x00 , 0x00, 0x00, 0x00, 0x00 };
     DwinReset();
     vTaskDelay(1000);
     DwinSetPage(1);

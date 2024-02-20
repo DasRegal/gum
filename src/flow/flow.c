@@ -118,9 +118,9 @@ void FlowBalanceUpdateCb(uint32_t balance)
             LcdUpdateBalance(flow_dev.balance);
             DwinSetPage(1);
             break;
+        default:
+            break;
     }
-
-    return false;
 }
 
 static void FlowIdleFunc(void)
@@ -128,7 +128,6 @@ static void FlowIdleFunc(void)
     uint16_t    button;
     uint32_t    price;
     bool        status = false;
-    uint32_t    balance = 0;
 
     status = DwinIsPushButton(&button);
     status |= SatIsPushButton(&button);

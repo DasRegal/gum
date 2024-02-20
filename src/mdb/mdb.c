@@ -108,16 +108,11 @@
 #define MDB_CURRENCY_CODE_RUB_1     0x643
 #define MDB_CURRENCY_CODE_RUB_2     0x810
 
-// extern void UsartDebugSendString(const char *pucBuffer);
-
-static void MdbSendCmd(uint8_t cmd, uint8_t subcmd, uint8_t * data, uint8_t len);
 static uint16_t MdbCalcChk(uint16_t * buf, uint8_t len);
 static bool MdbIsValidateChk(uint16_t * buf, uint8_t len);
 static void MdbSendData(uint16_t * buf, uint8_t len);
 static mdb_ret_resp_t MdbParseData(uint8_t len);
 static mdb_ret_resp_t MdbParseResponse(void);
-static void MdbSelectItem(void);
-static void MdbSessionCancel(void);
 
 typedef struct
 {
@@ -258,8 +253,6 @@ void MdbInit(mdv_dev_init_struct_t dev_struct)
 {
     mdb_dev.is_expansion_en = false;
     mdb_dev.send_callback   = dev_struct.send_callback;
-    mdb_dev.select_item_cb  = dev_struct.select_item_cb;
-    mdb_dev.session_cancel_cb = dev_struct.session_cancel_cb;
     mdb_dev.rx_len          = 0;
     mdb_dev.level           = MDB_LEVEL_3;
     mdb_dev.state           = MDB_STATE_INACTIVE;
@@ -348,39 +341,6 @@ void MdbAckCmd(void)
 {
     mdb_dev.tx_data[0] = MDB_ACK;
     MdbSendData(mdb_dev.tx_data, 1);
-}
-
-static void MdbSendCmd(uint8_t cmd, uint8_t subcmd, uint8_t * data, uint8_t len)
-{
-    mdb_dev.send_cmd    = cmd;
-    mdb_dev.send_subcmd = subcmd;
-
-    mdb_dev.tx_data[0] = cmd + mdb_dev.addr + MDB_MODE_BIT;
-
-    if (len)
-    {
-        mdb_dev.tx_data[1] = subcmd;
-    }
-
-    if (data != NULL)
-    {
-        for(uint8_t i = 1; i < len; i++)
-        {
-            mdb_dev.tx_data[i + 1] = (uint16_t)(data[i - 1] & 0x00FF);
-        }
-    }
-
-    if (len > 1)
-    {
-        mdb_dev.tx_data[len + 1] = MdbCalcChk(mdb_dev.tx_data, len + 1);
-        MdbSendData(mdb_dev.tx_data, len + 2);
-    }
-    else
-    {
-        mdb_dev.tx_data[len + 1] = MdbCalcChk(mdb_dev.tx_data, len + 1);
-        MdbSendData(mdb_dev.tx_data, len + 2);
-    }
-
 }
 
 static uint16_t MdbCalcChk(uint16_t * buf, uint8_t len)
@@ -674,22 +634,6 @@ static mdb_ret_resp_t MdbParseResponse(void)
         default: break;
     }
     return MDB_RET_OK_DATA;
-}
-
-static void MdbSelectItem(void)
-{
-    if (mdb_dev.select_item_cb == NULL)
-        return;
-
-    mdb_dev.select_item_cb();
-}
-
-static void MdbSessionCancel(void)
-{
-    if (mdb_dev.session_cancel_cb == NULL)
-        return;
-
-    mdb_dev.session_cancel_cb();
 }
 
 mdb_level_t MdbGetLevel(void)

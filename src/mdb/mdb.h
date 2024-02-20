@@ -97,8 +97,6 @@ typedef enum
 typedef struct
 {
     void            (*send_callback)(const uint16_t*, uint8_t);
-    void            (*select_item_cb)(void);
-    void            (*session_cancel_cb)(void);
 } mdv_dev_init_struct_t;
 
 typedef struct
@@ -126,7 +124,6 @@ typedef struct
     uint8_t         send_cmd;
     uint8_t         send_subcmd;
     void            (*send_callback)(const uint16_t*, uint8_t);
-    void            (*select_item_cb)(void);
     void            (*session_cancel_cb)(void);
     mdb_dev_slave_t dev_slave;
     mdb_state_t     state;
