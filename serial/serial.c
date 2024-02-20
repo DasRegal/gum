@@ -1,2 +1,8 @@
 #define TEXT "SBCA0022"
-char __attribute__((section(".mb1text"))) buf[10] = "1234567890";
+__attribute__((__section__(".mb1text")))
+char buf[10] = "1234567890";
+
+int main()
+{
+    return buf[0];
+}
