@@ -15,11 +15,16 @@
 #include "coinbox.h"
 #include "src/flow/flow.h"
 
-#define CCTALK_CLI_CMD_FLAG     (1)
-#define CCTALK_SEQ_1_CMD_FLAG   (1 << 1)
-#define CCTALK_SEQ_2_CMD_FLAG   (1 << 2)
-#define CCTALK_SEQ_3_CMD_FLAG   (1 << 3)
-#define CCTALK_SEQ_4_CMD_FLAG   (1 << 4)
+#define CCTALK_CLI_CMD_FLAG             (1)
+
+#define CCTALK_SEQ_INIT_1_CMD_FLAG      (1 << 1)
+#define CCTALK_SEQ_INIT_2_CMD_FLAG      (1 << 2)
+#define CCTALK_SEQ_INIT_3_CMD_FLAG      (1 << 3)
+#define CCTALK_SEQ_INIT_4_CMD_FLAG      (1 << 4)
+#define CCTALK_SEQ_INIT_ANY_CMD_FLAG    (CCTALK_SEQ_INIT_1_CMD_FLAG | \
+                                         CCTALK_SEQ_INIT_2_CMD_FLAG | \
+                                         CCTALK_SEQ_INIT_3_CMD_FLAG | \
+                                         CCTALK_SEQ_INIT_4_CMD_FLAG)
 
 typedef struct
 {
@@ -31,12 +36,12 @@ typedef struct
 } coinbox_data_t;
 
 static EventGroupHandle_t  xCCTalkEventGroup;
-static SemaphoreHandle_t   xBalanceMutex;
 static bool is_balance_change = false;
 static QueueHandle_t fdBuferCctalk;
 static volatile char*    pCBTxData;
 static volatile uint8_t  CBTxLen;
 static coinbox_data_t coinbox_data;
+static TaskHandle_t xCctalkSendHandle;
 
 static void CctalkUsartInit(void);
 static void vTaskCctalkSend ( void *pvParameters);
@@ -56,16 +61,15 @@ void CoinBoxInit(void)
 
     xCCTalkEventGroup = xEventGroupCreate();
 
-    xBalanceMutex = xSemaphoreCreateMutex();
-
     xTaskCreate(vTaskCctalkReceive, (const char*)"cctalk rx", 500, NULL, tskIDLE_PRIORITY + 1, (TaskHandle_t*)NULL);
-    xTaskCreate(vTaskCctalkSend,    (const char*)"cctalk tx", 256, NULL, tskIDLE_PRIORITY + 1, (TaskHandle_t*)NULL);
+    xTaskCreate(vTaskCctalkSend,    (const char*)"cctalk tx", 256, NULL, tskIDLE_PRIORITY + 1,  &xCctalkSendHandle);
 }
 
 static void vTaskCctalkReceive(void *pvParameters)
 {
     uint8_t              ch;
     cctalk_master_dev_t *dev;
+    EventBits_t          flags;
 
     dev = CctalkGetDev();
 
@@ -73,23 +77,30 @@ static void vTaskCctalkReceive(void *pvParameters)
     {
         if (xQueueReceive(fdBuferCctalk, &ch, 1000) == pdPASS)
         {
-            xSemaphoreTake(xBalanceMutex, portMAX_DELAY);
-                if(CctalkGetCharHandler(ch))
+            if(CctalkGetCharHandler(ch))
+            {
+                CctalkAnswerHandle();
+                if (dev->credit.balance)
                 {
-                    if (dev->credit.balance)
-                    {
-                        is_balance_change = true;
-                        FlowBalanceUpdateCb(dev->credit.balance);
-                        dev->credit.balance = 0;
-                    }
-                    CctalkAnswerHandle();
+                    is_balance_change = true;
+                    FlowBalanceUpdateCb(dev->credit.balance);
+                    dev->credit.balance = 0;
                 }
-            xSemaphoreGive(xBalanceMutex);
+
+                flags = xEventGroupGetBits(xCCTalkEventGroup);
+                if (flags & CCTALK_SEQ_INIT_ANY_CMD_FLAG)
+                {
+                    xEventGroupClearBits(xCCTalkEventGroup, flags);
+                    xEventGroupSetBits(xCCTalkEventGroup, flags << 1);
+                    vTaskResume(xCctalkSendHandle);
+                    continue;
+                }
+            }
         }
         else
         {
             /* Reset */
-            xEventGroupSetBits(xCCTalkEventGroup, CCTALK_SEQ_1_CMD_FLAG);
+            xEventGroupSetBits(xCCTalkEventGroup, CCTALK_SEQ_INIT_1_CMD_FLAG);
         }
     }
 }
@@ -97,9 +108,10 @@ static void vTaskCctalkReceive(void *pvParameters)
 static void vTaskCctalkSend ( void *pvParameters)
 {
     EventBits_t flags;
+    uint8_t     data[2];
 
     vTaskDelay(500);
-    xEventGroupSetBits(xCCTalkEventGroup, CCTALK_SEQ_1_CMD_FLAG);
+    xEventGroupSetBits(xCCTalkEventGroup, CCTALK_SEQ_INIT_1_CMD_FLAG);
 
     /**
       * data[0] = 7;
@@ -118,53 +130,36 @@ static void vTaskCctalkSend ( void *pvParameters)
     {
         flags = xEventGroupGetBits(xCCTalkEventGroup);
 
+        switch(flags & CCTALK_SEQ_INIT_ANY_CMD_FLAG)
+        {
+            case CCTALK_SEQ_INIT_1_CMD_FLAG:
+                CctalkSendData(CCTALK_HDR_MOD_MASTER_INH_STAT, NULL, 0);
+                vTaskSuspend( NULL );
+                continue;
+            case CCTALK_SEQ_INIT_2_CMD_FLAG:
+                data[0] = 0;
+                data[1] = 0;
+                CctalkSendData(CCTALK_HDR_MOD_INH_STAT, data, 2);
+                vTaskSuspend( NULL );
+                continue;
+            case CCTALK_SEQ_INIT_3_CMD_FLAG:
+                data[0] = 255;
+                data[1] = 255;
+                CctalkSendData(CCTALK_HDR_MOD_INH_STAT, data, 2);
+                vTaskSuspend( NULL );
+                continue;
+            case CCTALK_SEQ_INIT_4_CMD_FLAG:
+                CctalkSendData(CCTALK_HDR_REQ_INH_STAT, NULL, 0);
+                vTaskSuspend( NULL );
+                xEventGroupClearBits(xCCTalkEventGroup, CCTALK_SEQ_INIT_4_CMD_FLAG);
+                continue;
+            default:
+                break;
+        }
+
         if (flags & CCTALK_CLI_CMD_FLAG)
         {
-            xEventGroupClearBits(xCCTalkEventGroup, CCTALK_CLI_CMD_FLAG);
             CctalkSendData(coinbox_data.hdr, coinbox_data.data, coinbox_data.size);
-            continue;
-        }
-
-        if (flags & CCTALK_SEQ_1_CMD_FLAG)
-        {
-            uint8_t data[1];
-            xEventGroupClearBits(xCCTalkEventGroup, CCTALK_SEQ_1_CMD_FLAG);
-            data[0] = 0;
-            CctalkSendData(CCTALK_HDR_MOD_MASTER_INH_STAT, data, 0);
-            vTaskDelay(200);
-            xEventGroupSetBits(xCCTalkEventGroup, CCTALK_SEQ_2_CMD_FLAG);
-            continue;
-        }
-
-        if (flags & CCTALK_SEQ_2_CMD_FLAG)
-        {
-            uint8_t data[2];
-            xEventGroupClearBits(xCCTalkEventGroup, CCTALK_SEQ_2_CMD_FLAG);
-            data[0] = 0;
-            data[1] = 0;
-            CctalkSendData(CCTALK_HDR_MOD_INH_STAT, data, 2);
-            vTaskDelay(200);
-            xEventGroupSetBits(xCCTalkEventGroup, CCTALK_SEQ_3_CMD_FLAG);
-            continue;
-        }
-
-        if (flags & CCTALK_SEQ_3_CMD_FLAG)
-        {
-            uint8_t data[2];
-            xEventGroupClearBits(xCCTalkEventGroup, CCTALK_SEQ_3_CMD_FLAG);
-            data[0] = 255;
-            data[1] = 255;
-            CctalkSendData(CCTALK_HDR_MOD_INH_STAT, data, 2);
-            vTaskDelay(200);
-            xEventGroupSetBits(xCCTalkEventGroup, CCTALK_SEQ_4_CMD_FLAG);
-            continue;
-        }
-
-        if (flags & CCTALK_SEQ_4_CMD_FLAG)
-        {
-            xEventGroupClearBits(xCCTalkEventGroup, CCTALK_SEQ_4_CMD_FLAG);
-            CctalkSendData(CCTALK_HDR_REQ_INH_STAT, NULL, 0);
-            vTaskDelay(200);
             continue;
         }
 
@@ -179,27 +174,6 @@ void CoinBoxGetData(char **buf, uint8_t *len)
     dev = CctalkGetDev();
     *buf = dev->buf;
     *len = dev->buf_data_len;
-}
-
-bool CoinBoxIsUpdateBalance(uint32_t *balance)
-{
-    cctalk_master_dev_t *dev;
-    uint32_t val;
-
-    dev = CctalkGetDev();
-
-    xSemaphoreTake(xBalanceMutex, portMAX_DELAY);
-        if (!is_balance_change)
-        {
-            return false;
-        }
-
-        is_balance_change = false;
-        val = dev->credit.balance;
-        dev->credit.balance = 0;
-        *balance = val;
-    xSemaphoreGive(xBalanceMutex);
-    return true;
 }
 
 void CoinBoxCliCmdSendData(uint8_t hdr, uint8_t *buf, uint8_t len)
