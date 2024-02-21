@@ -42,6 +42,7 @@ static volatile char*    pCBTxData;
 static volatile uint8_t  CBTxLen;
 static coinbox_data_t coinbox_data;
 static TaskHandle_t xCctalkSendHandle;
+static SemaphoreHandle_t xCoinBoxGetDataSem;
 
 static void CctalkUsartInit(void);
 static void vTaskCctalkSend ( void *pvParameters);
@@ -60,6 +61,7 @@ void CoinBoxInit(void)
     CctalkUsartInit();
 
     xCCTalkEventGroup = xEventGroupCreate();
+    vSemaphoreCreateBinary(xCoinBoxGetDataSem);
 
     xTaskCreate(vTaskCctalkReceive, (const char*)"cctalk rx", 500, NULL, tskIDLE_PRIORITY + 1, (TaskHandle_t*)NULL);
     xTaskCreate(vTaskCctalkSend,    (const char*)"cctalk tx", 256, NULL, tskIDLE_PRIORITY + 1,  &xCctalkSendHandle);
@@ -93,6 +95,14 @@ static void vTaskCctalkReceive(void *pvParameters)
                     xEventGroupClearBits(xCCTalkEventGroup, flags);
                     xEventGroupSetBits(xCCTalkEventGroup, flags << 1);
                     vTaskResume(xCctalkSendHandle);
+                    continue;
+                }
+
+                if (flags & CCTALK_CLI_CMD_FLAG)
+                {
+                    xEventGroupClearBits(xCCTalkEventGroup, CCTALK_CLI_CMD_FLAG);
+                    vTaskResume(xCctalkSendHandle);
+                    xSemaphoreGive(xCoinBoxGetDataSem);
                     continue;
                 }
             }
@@ -160,7 +170,8 @@ static void vTaskCctalkSend ( void *pvParameters)
         if (flags & CCTALK_CLI_CMD_FLAG)
         {
             CctalkSendData(coinbox_data.hdr, coinbox_data.data, coinbox_data.size);
-            continue;
+            vTaskSuspend( NULL );
+            vTaskDelay(10);
         }
 
         CctalkSendData(CCTALK_HDR_READ_BUF_CREDIT, NULL, 0);
@@ -170,6 +181,7 @@ static void vTaskCctalkSend ( void *pvParameters)
 
 void CoinBoxGetData(char **buf, uint8_t *len)
 {
+    xSemaphoreTake(xCoinBoxGetDataSem, 100);
     cctalk_master_dev_t *dev;
     dev = CctalkGetDev();
     *buf = dev->buf;
@@ -187,6 +199,7 @@ void CoinBoxCliCmdSendData(uint8_t hdr, uint8_t *buf, uint8_t len)
     }
 
     xEventGroupSetBits(xCCTalkEventGroup, CCTALK_CLI_CMD_FLAG);
+    xSemaphoreTake(xCoinBoxGetDataSem, ( TickType_t ) 0);
 }
 
 static void CctalkUsartInit(void)

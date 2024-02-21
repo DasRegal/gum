@@ -334,7 +334,6 @@ char cctalk_func_cmd(unsigned char args, void* argv)
     }
 
     CoinBoxCliCmdSendData(hdr, buf, size);
-    vTaskDelay(20);
     CoinBoxGetData(&b, &size);
     PRINT_OS("\r\n");
     for (uint8_t i = 0; i < size; i++)
