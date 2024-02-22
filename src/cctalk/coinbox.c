@@ -143,7 +143,8 @@ static void vTaskCctalkSend ( void *pvParameters)
         switch(flags & CCTALK_SEQ_INIT_ANY_CMD_FLAG)
         {
             case CCTALK_SEQ_INIT_1_CMD_FLAG:
-                CctalkSendData(CCTALK_HDR_MOD_MASTER_INH_STAT, NULL, 0);
+                data[0] = 1;
+                CctalkSendData(CCTALK_HDR_MOD_MASTER_INH_STAT, data, 1);
                 vTaskSuspend( NULL );
                 continue;
             case CCTALK_SEQ_INIT_2_CMD_FLAG:
