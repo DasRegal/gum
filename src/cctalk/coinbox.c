@@ -111,6 +111,7 @@ static void vTaskCctalkReceive(void *pvParameters)
         {
             /* Reset */
             xEventGroupSetBits(xCCTalkEventGroup, CCTALK_SEQ_INIT_1_CMD_FLAG);
+            vTaskResume(xCctalkSendHandle);
         }
     }
 }
@@ -143,26 +144,33 @@ static void vTaskCctalkSend ( void *pvParameters)
         switch(flags & CCTALK_SEQ_INIT_ANY_CMD_FLAG)
         {
             case CCTALK_SEQ_INIT_1_CMD_FLAG:
-                data[0] = 1;
-                CctalkSendData(CCTALK_HDR_MOD_MASTER_INH_STAT, data, 1);
+                /* Simple poll */
+                CctalkSendData(CCTALK_HDR_SIMPLE_POLL, NULL, 0);
                 vTaskSuspend( NULL );
                 continue;
             case CCTALK_SEQ_INIT_2_CMD_FLAG:
-                data[0] = 0;
-                data[1] = 0;
+                /*
+                 * 0 - coin disabled (inhibited)
+                 * 1 - coin enabled (not inhibited)
+                 */
+                /* Inhibit mask 1. Coin 1 - Coin 8*/
+                data[0] = 0b11111111;
+                /* Inhibit mask 1. Coin 9 - Coin 16*/
+                data[1] = 0b11111111;
                 CctalkSendData(CCTALK_HDR_MOD_INH_STAT, data, 2);
                 vTaskSuspend( NULL );
                 continue;
             case CCTALK_SEQ_INIT_3_CMD_FLAG:
-                data[0] = 255;
-                data[1] = 255;
-                CctalkSendData(CCTALK_HDR_MOD_INH_STAT, data, 2);
+                /* Master inhibit */
+                /* [xxxxxxx1]
+                 * Bit 0 only used
+                 * 0 - master inhibit active
+                 * 1 - normal operation
+                 */
+                data[0] = 0b00000001;
+                CctalkSendData(CCTALK_HDR_MOD_MASTER_INH_STAT, data, 1);
                 vTaskSuspend( NULL );
-                continue;
-            case CCTALK_SEQ_INIT_4_CMD_FLAG:
-                CctalkSendData(CCTALK_HDR_REQ_INH_STAT, NULL, 0);
-                vTaskSuspend( NULL );
-                xEventGroupClearBits(xCCTalkEventGroup, CCTALK_SEQ_INIT_4_CMD_FLAG);
+                xEventGroupClearBits(xCCTalkEventGroup, CCTALK_SEQ_INIT_ANY_CMD_FLAG);
                 continue;
             default:
                 break;
@@ -172,17 +180,16 @@ static void vTaskCctalkSend ( void *pvParameters)
         {
             CctalkSendData(coinbox_data.hdr, coinbox_data.data, coinbox_data.size);
             vTaskSuspend( NULL );
-            vTaskDelay(10);
         }
 
         CctalkSendData(CCTALK_HDR_READ_BUF_CREDIT, NULL, 0);
-        vTaskDelay(500);
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
 
 void CoinBoxGetData(char **buf, uint8_t *len)
 {
-    xSemaphoreTake(xCoinBoxGetDataSem, 100);
+    xSemaphoreTake(xCoinBoxGetDataSem, pdMS_TO_TICKS(1000));
     cctalk_master_dev_t *dev;
     dev = CctalkGetDev();
     *buf = dev->buf;
