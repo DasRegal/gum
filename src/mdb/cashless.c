@@ -165,8 +165,8 @@ void CashlessInit(void)
 
     MdbUsartInit();
 
-    xTaskCreate(vTaskCLRx, "Cashless_RX", 128, NULL, tskIDLE_PRIORITY + 2, NULL);
-    xTaskCreate(vTaskCLTx, "Cashless_TX", 256, NULL, tskIDLE_PRIORITY + 2, NULL);
+    xTaskCreate(vTaskCLRx, "Cashless_RX", 256, NULL, tskIDLE_PRIORITY + 2, NULL);
+    xTaskCreate(vTaskCLTx, "Cashless_TX", 384, NULL, tskIDLE_PRIORITY + 2, NULL);
 }
 
 static void CashlessReset(void)
